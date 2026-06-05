@@ -1,0 +1,355 @@
+{
+  "health": {
+    "status": "pass",
+    "response": {
+      "status": "ok",
+      "service": "feedlens",
+      "version": "1.0.0"
+    }
+  },
+  "listings": [
+    {
+      "id": "clean_1",
+      "category": "clean",
+      "expected": "approved",
+      "actual": "approved",
+      "status": "pass",
+      "rule_matches": [],
+      "llm_triggered": false,
+      "je_id": "QA-CLEAN-001"
+    },
+    {
+      "id": "clean_2",
+      "category": "clean",
+      "expected": "approved",
+      "actual": "rejected",
+      "status": "fail",
+      "rule_matches": [
+        "gpt_watermark_sold_spain",
+        "duplicates_spain"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-CLEAN-002"
+    },
+    {
+      "id": "clean_3",
+      "category": "clean",
+      "expected": "approved",
+      "actual": "rejected",
+      "status": "fail",
+      "rule_matches": [
+        "duplicates_france"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-CLEAN-003"
+    },
+    {
+      "id": "clean_4",
+      "category": "clean",
+      "expected": "approved",
+      "actual": "rejected",
+      "status": "fail",
+      "rule_matches": [
+        "gpt_watermark_sold_portugal",
+        "duplicates_portugal"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-CLEAN-004"
+    },
+    {
+      "id": "clean_5",
+      "category": "clean",
+      "expected": "approved",
+      "actual": "rejected",
+      "status": "fail",
+      "rule_matches": [
+        "gpt_condition_manual_italy",
+        "gpt_watermark_sold_italy",
+        "gpt_unidentifiable_auto_italy",
+        "duplicates_italy"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-CLEAN-005"
+    },
+    {
+      "id": "low_res_1",
+      "category": "low_image_resolution",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_image_resolution",
+        "gpt_condition_auto_spain",
+        "gpt_condition_manual_spain",
+        "gpt_conclusion_spain",
+        "gpt_watermark_sold_spain",
+        "gpt_unidentifiable_auto_spain",
+        "duplicates_spain"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-LOWRES-001"
+    },
+    {
+      "id": "low_res_2",
+      "category": "low_image_resolution",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_image_resolution"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-LOWRES-002"
+    },
+    {
+      "id": "low_res_3",
+      "category": "low_image_resolution",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_image_resolution",
+        "gpt_condition_auto_italy",
+        "gpt_condition_manual_italy",
+        "gpt_watermark_sold_italy",
+        "gpt_unidentifiable_auto_italy",
+        "duplicates_italy"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-LOWRES-003"
+    },
+    {
+      "id": "low_lqi_1",
+      "category": "low_lqi",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_lqi",
+        "duplicates_greece"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-LOWLQI-001"
+    },
+    {
+      "id": "low_lqi_2",
+      "category": "low_lqi",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_lqi",
+        "gpt_condition_auto_portugal",
+        "gpt_watermark_sold_portugal",
+        "duplicates_portugal"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-LOWLQI-002"
+    },
+    {
+      "id": "few_pics_1",
+      "category": "few_pictures",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "few_pictures",
+        "gpt_condition_auto_spain",
+        "gpt_condition_manual_spain",
+        "gpt_watermark_sold_spain",
+        "duplicates_spain"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-FEWPICS-001"
+    },
+    {
+      "id": "few_pics_2",
+      "category": "few_pictures",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "low_image_resolution",
+        "few_pictures",
+        "duplicates_france"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-FEWPICS-002"
+    },
+    {
+      "id": "watermark_1",
+      "category": "watermark_high",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "gpt_condition_auto_italy",
+        "gpt_condition_manual_italy",
+        "gpt_watermark_sold_italy",
+        "gpt_unidentifiable_auto_italy",
+        "duplicates_italy"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-WMARK-001"
+    },
+    {
+      "id": "watermark_2",
+      "category": "watermark_high",
+      "expected": "rejected",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "gpt_condition_auto_spain",
+        "gpt_watermark_sold_spain",
+        "duplicates_spain"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-WMARK-002"
+    },
+    {
+      "id": "commercial_1",
+      "category": "commercial_keywords",
+      "expected": "manual",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "duplicates_us"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-COMM-001"
+    },
+    {
+      "id": "commercial_2",
+      "category": "commercial_keywords",
+      "expected": "manual",
+      "actual": "manual",
+      "status": "pass",
+      "rule_matches": [
+        "commercial_properties_title",
+        "commercial_properties_23"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-COMM-002"
+    },
+    {
+      "id": "sold_1",
+      "category": "sold_listing",
+      "expected": "manual",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "duplicates_uae"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-SOLD-001"
+    },
+    {
+      "id": "sold_2",
+      "category": "sold_listing",
+      "expected": "manual",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "duplicates_greece"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-SOLD-002"
+    },
+    {
+      "id": "extreme_price_1",
+      "category": "extreme_price",
+      "expected": "manual",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "price_too_low_re",
+        "duplicates_france"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-PRICE-001"
+    },
+    {
+      "id": "extreme_price_2",
+      "category": "extreme_price",
+      "expected": "manual",
+      "actual": "rejected",
+      "status": "pass",
+      "rule_matches": [
+        "price_too_low_re",
+        "gpt_condition_auto_portugal",
+        "gpt_watermark_sold_portugal",
+        "duplicates_portugal"
+      ],
+      "llm_triggered": false,
+      "je_id": "QA-PRICE-002"
+    }
+  ],
+  "summary": {
+    "total": 20,
+    "passed": 16,
+    "failed": 4,
+    "errors": 0
+  },
+  "rule_categories": {
+    "hybrid_vision": {
+      "count": 27,
+      "rules": {
+        "gpt_watermark_sold_spain": 4,
+        "gpt_watermark_sold_portugal": 3,
+        "gpt_condition_manual_italy": 3,
+        "gpt_watermark_sold_italy": 3,
+        "gpt_unidentifiable_auto_italy": 3,
+        "gpt_condition_auto_spain": 3,
+        "gpt_condition_manual_spain": 2,
+        "gpt_conclusion_spain": 1,
+        "gpt_unidentifiable_auto_spain": 1,
+        "gpt_condition_auto_italy": 2,
+        "gpt_condition_auto_portugal": 2
+      }
+    },
+    "simple_code": {
+      "count": 27,
+      "rules": {
+        "duplicates_spain": 4,
+        "duplicates_france": 3,
+        "duplicates_portugal": 3,
+        "duplicates_italy": 3,
+        "low_image_resolution": 4,
+        "low_lqi": 2,
+        "duplicates_greece": 2,
+        "few_pictures": 2,
+        "duplicates_us": 1,
+        "duplicates_uae": 1,
+        "price_too_low_re": 2
+      }
+    },
+    "auto_ai": {
+      "count": 2,
+      "rules": {
+        "commercial_properties_title": 1,
+        "commercial_properties_23": 1
+      }
+    }
+  },
+  "outcomes": {
+    "approved": 1,
+    "rejected": 18,
+    "manual": 1,
+    "notice": 0,
+    "error": 0
+  },
+  "issues": [
+    "clean_2: Expected 'approved' but got 'rejected' (rules: ['gpt_watermark_sold_spain', 'duplicates_spain'])",
+    "clean_3: Expected 'approved' but got 'rejected' (rules: ['duplicates_france'])",
+    "clean_4: Expected 'approved' but got 'rejected' (rules: ['gpt_watermark_sold_portugal', 'duplicates_portugal'])",
+    "clean_5: Expected 'approved' but got 'rejected' (rules: ['gpt_condition_manual_italy', 'gpt_watermark_sold_italy', 'gpt_unidentifiable_auto_italy', 'duplicates_italy'])"
+  ],
+  "stats": {
+    "approved": 38,
+    "manual": 1,
+    "noticed": 1,
+    "pending": 0,
+    "rejected": 33,
+    "total": 73
+  }
+}
