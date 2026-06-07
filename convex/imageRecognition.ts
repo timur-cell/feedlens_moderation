@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireModerator } from "./authz";
 
 // Store recognition results
 export const saveResult = mutation({
@@ -13,6 +14,7 @@ export const saveResult = mutation({
     analyzedAt: v.number(),
   },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     return await ctx.db.insert("imageRecognitionResults", {
       listingId: args.listingId,
       jeId: args.jeId,
@@ -41,6 +43,7 @@ export const listResults = query({
 export const deleteResult = mutation({
   args: { id: v.id("imageRecognitionResults") },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     await ctx.db.delete(args.id);
   },
 });
@@ -49,6 +52,7 @@ export const deleteResult = mutation({
 export const clearAllResults = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const results = await ctx.db.query("imageRecognitionResults").collect();
     for (const r of results) {
       await ctx.db.delete(r._id);
@@ -84,6 +88,7 @@ export const saveListingAnalysis = mutation({
     analyzedAt: v.number(),
   },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     return await ctx.db.insert("listingImageAnalyses", args);
   },
 });
@@ -103,6 +108,7 @@ export const listListingAnalyses = query({
 export const deleteListingAnalysis = mutation({
   args: { id: v.id("listingImageAnalyses") },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     await ctx.db.delete(args.id);
   },
 });
@@ -111,6 +117,7 @@ export const deleteListingAnalysis = mutation({
 export const clearAllListingAnalyses = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const results = await ctx.db.query("listingImageAnalyses").collect();
     for (const r of results) {
       await ctx.db.delete(r._id);
@@ -135,6 +142,7 @@ export const updateListingAnalysisImplioStatus = mutation({
     implioSubmittedAt: v.number(),
   },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     await ctx.db.patch(args.id, {
       implioStatus: args.implioStatus,
       implioSubmittedAt: args.implioSubmittedAt,

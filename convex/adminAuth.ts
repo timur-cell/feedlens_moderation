@@ -3,8 +3,9 @@ import { v } from "convex/values";
 import { Scrypt } from "lucia";
 import { internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { DEFAULT_USER_PASSWORD } from "./serverConfig";
 
-const DEFAULT_PASSWORD = "je_feedlens2026_1";
+const DEFAULT_PASSWORD = DEFAULT_USER_PASSWORD;
 
 /**
  * Create a user with auth account — called from admin panel.

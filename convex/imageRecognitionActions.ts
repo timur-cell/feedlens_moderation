@@ -2,6 +2,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { requireModeratorAction } from "./authz";
 
 // ─── Configuration ───────────────────────────────────────────────
 // Switch VISION_PROVIDER to "claude" when ready to migrate
@@ -472,7 +473,8 @@ export const analyzeImages_standalone = action({
     listingId: v.string(),
     provider: v.optional(v.string()), // "openai" | "claude" — defaults to VISION_PROVIDER
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await requireModeratorAction(ctx);
     if (args.imageUrls.length === 0) {
       return { ...EMPTY_RESULT, error: "No image URLs provided" };
     }
@@ -488,7 +490,8 @@ export const analyzeWithClaude = action({
     listingTitle: v.string(),
     listingId: v.string(),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await requireModeratorAction(ctx);
     if (args.imageUrls.length === 0) {
       return { ...EMPTY_RESULT, error: "No image URLs provided" };
     }
@@ -704,6 +707,7 @@ export const analyzeListingByUrl = action({
     maxImages: v.optional(v.number()), // default 10
   },
   handler: async (ctx, args) => {
+    await requireModeratorAction(ctx);
     const maxImages = args.maxImages || 10;
 
     // 1. Extract JE ID from input
@@ -874,6 +878,7 @@ export const submitListingToImplio = action({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireModeratorAction(ctx);
     // 1. Fetch the analysis record
     const analysis: any = await ctx.runQuery(api.imageRecognition.getListingAnalysis, { id: args.analysisId });
     if (!analysis) {
@@ -981,7 +986,8 @@ export const analyzeForModeration = action({
     listingTitle: v.string(),
     jeId: v.string(),
   },
-  handler: async (_ctx, args): Promise<VisionResult> => {
+  handler: async (ctx, args): Promise<VisionResult> => {
+    await requireModeratorAction(ctx);
     if (args.imageUrls.length === 0) {
       return { ...EMPTY_RESULT, error: "No image URLs provided" };
     }

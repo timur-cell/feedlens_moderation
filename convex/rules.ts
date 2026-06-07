@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
+import { requireAdmin, requireModerator } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export const create = mutation({
   },
   returns: v.id("rules"),
   handler: async (ctx, { modifiedBy, ...args }) => {
+    await requireAdmin(ctx);
     const now = Date.now();
     return await ctx.db.insert("rules", {
       ...args,
@@ -91,6 +93,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, modifiedBy, ...updates }) => {
+    await requireAdmin(ctx);
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([, v]) => v !== undefined)
     );
@@ -105,6 +108,7 @@ export const toggleEnabled = mutation({
   args: { id: v.id("rules"), modifiedBy: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, { id, modifiedBy }) => {
+    await requireAdmin(ctx);
     const rule = await ctx.db.get(id);
     if (rule) {
       await ctx.db.patch(id, {
@@ -121,6 +125,7 @@ export const remove = mutation({
   args: { id: v.id("rules") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
     await ctx.db.delete(id);
     return null;
   },
@@ -130,6 +135,7 @@ export const incrementMatch = mutation({
   args: { id: v.id("rules") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireModerator(ctx);
     const rule = await ctx.db.get(id);
     if (rule) {
       await ctx.db.patch(id, {
@@ -145,6 +151,7 @@ export const incrementFalsePositive = mutation({
   args: { id: v.id("rules") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireModerator(ctx);
     const rule = await ctx.db.get(id);
     if (rule) {
       await ctx.db.patch(id, {
@@ -160,6 +167,7 @@ export const migrateListingCategories = mutation({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     const carsRules = new Set([
       "cars_low_price", "cars_no_year", "cars_freemium_low_price",
       "cars_truck_models", "cars_non_luxury_brand", "cars_model_check",
@@ -187,6 +195,7 @@ export const migrateAddTimestamps = mutation({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     const allRules = await ctx.db.query("rules").collect();
     let updated = 0;
     const now = Date.now();
@@ -209,6 +218,7 @@ export const migrateGptToAi = mutation({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     const allRules = await ctx.db.query("rules").collect();
     let updated = 0;
     for (const rule of allRules) {

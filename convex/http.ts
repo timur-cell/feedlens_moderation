@@ -118,7 +118,11 @@ http.route({
 
     for (const item of listings) {
       try {
-        const jeId = String(item.listing_id || item.jeId);
+        // Use the first id that is actually present. NOTE: String(a || b)
+        // would yield the literal "undefined" when both are missing, which is
+        // truthy and silently bypasses the guard below.
+        const rawId = item.listing_id != null ? item.listing_id : item.jeId;
+        const jeId = rawId != null ? String(rawId).trim() : "";
         if (!jeId) {
           results.errors.push("Missing listing_id");
           continue;
@@ -166,12 +170,14 @@ http.route({
           await ctx.runMutation(api.listings.patchAccuracyData, {
             id: (existing as any)._id,
             ...accuracyData,
+            systemKey: apiKey,
           });
 
           // LAS-flagged listings go straight to manual review queue
           await ctx.runMutation(api.listings.updateStatus, {
             id: (existing as any)._id,
             status: "manual",
+            systemKey: apiKey,
           });
 
           results.updated++;
@@ -192,6 +198,7 @@ http.route({
             bathrooms: item.bathrooms != null ? Number(item.bathrooms) : undefined,
             officeSubscription: item.account_type || undefined,
             office: item.office_id ? String(item.office_id) : undefined,
+            systemKey: apiKey,
           });
 
           // Now fetch the created listing to patch accuracy data
@@ -200,6 +207,7 @@ http.route({
             await ctx.runMutation(api.listings.patchAccuracyData, {
               id: (created as any)._id,
               ...accuracyData,
+              systemKey: apiKey,
             });
           }
 
@@ -208,6 +216,7 @@ http.route({
             await ctx.runMutation(api.listings.updateStatus, {
               id: (created as any)._id,
               status: "manual",
+              systemKey: apiKey,
             });
 
             // Schedule async enrichment: fetch full listing data from JE API

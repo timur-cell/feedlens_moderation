@@ -2,6 +2,7 @@
 import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { requireModeratorAction } from "./authz";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -483,6 +484,7 @@ export const fetchAndModerate = action({
   },
   returns: v.any(),
   handler: async (ctx, { inputs }) => {
+    await requireModeratorAction(ctx);
     const results: Array<{
       jeId: string;
       input: string;
@@ -530,9 +532,20 @@ export const fetchAndModerate = action({
         let url: string;
 
         if (isUrl) {
-          // Extract ID from URL — try last number after - or / 
+          // Extract ID from URL — prefer a 5+ digit number right after - or /
           const idMatch = trimmed.match(/[-\/](\d{5,})(?:[?#]|$)/);
-          jeId = idMatch ? idMatch[1] : trimmed.replace(/\D/g, '').slice(-8);
+          if (idMatch) {
+            jeId = idMatch[1];
+          } else {
+            // Fallback: pick the longest standalone run of 5+ digits (ties → the
+            // last one). Avoids concatenating unrelated digits across the whole
+            // URL (e.g. a "2024" in the slug + an "?ref=12345678" tracking param),
+            // which previously produced a wrong id via replace(/\D/g,'').slice(-8).
+            const digitRuns = trimmed.match(/\d{5,}/g) || [];
+            jeId = digitRuns.sort(
+              (a, b) => a.length - b.length || trimmed.lastIndexOf(a) - trimmed.lastIndexOf(b),
+            ).pop() || "";
+          }
           url = trimmed;
         } else {
           jeId = trimmed.replace(/\D/g, '');
@@ -814,6 +827,9 @@ export const enrichListing = internalAction({
         officeSubscription: listingData.officeSubscription,
         listingUrl: listingData.listingUrl,
         pricePerSqm,
+        // Scheduled/internal context has no signed-in moderator — authorize the
+        // write with the trusted-pipeline key.
+        systemKey: process.env.LAS_PUSH_API_KEY,
       });
 
       return { success: true, dataSource };

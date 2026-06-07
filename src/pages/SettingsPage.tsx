@@ -1,5 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { formatRelativeTime } from "@/lib/utils";
 import {
   AlertTriangle,
   Bell,
@@ -155,18 +156,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   invited: { label: "Invited", color: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300" },
   disabled: { label: "Disabled", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
 };
-
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(ts).toLocaleDateString();
-}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Section 1: Profile & Account

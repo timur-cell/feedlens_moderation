@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { requireAdminAction } from "./authz";
+import { DEFAULT_USER_PASSWORD } from "./serverConfig";
 
-const DEFAULT_PASSWORD = "je_feedlens2026_1";
+const DEFAULT_PASSWORD = DEFAULT_USER_PASSWORD;
 
 const resultValidator = v.object({
   success: v.boolean(),
@@ -29,6 +31,8 @@ export const createUserWithLogin = action({
     message: string;
     password: string;
   }> => {
+    const admin = await requireAdminAction(ctx);
+
     const password = args.password || DEFAULT_PASSWORD;
 
     const result: { success: boolean; moderatorId?: string; message: string } =
@@ -37,6 +41,7 @@ export const createUserWithLogin = action({
         email: args.email,
         role: args.role,
         password,
+        invitedBy: admin.email,
       });
 
     return {
@@ -62,6 +67,8 @@ export const setUserPassword = action({
   },
   returns: passwordResultValidator,
   handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
+    await requireAdminAction(ctx);
+
     const result: { success: boolean; message: string } =
       await ctx.runAction(internal.adminAuth.resetUserPassword, {
         email: args.email,

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin, requireModerator } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -7,6 +8,7 @@ export const listUsers = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db.query("moderators").collect();
   },
 });
@@ -15,10 +17,14 @@ export const getUserById = query({
   args: { id: v.id("moderators") },
   returns: v.any(),
   handler: async (ctx, { id }) => {
+    await requireModerator(ctx);
     return await ctx.db.get(id);
   },
 });
 
+// NOTE: intentionally NOT gated — this is an auth primitive used by
+// authz.requireModeratorAction() to resolve the calling user to a moderator
+// row from action contexts. It only returns a single row matched by email.
 export const getUserByEmail = query({
   args: { email: v.string() },
   returns: v.any(),
@@ -34,6 +40,7 @@ export const getUserActivity = query({
   args: { moderatorId: v.id("moderators"), limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { moderatorId, limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderatorActivity")
       .withIndex("by_moderator", (q) => q.eq("moderatorId", moderatorId))
@@ -46,6 +53,7 @@ export const getRecentActivity = query({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderatorActivity")
       .withIndex("by_timestamp")
@@ -58,6 +66,7 @@ export const getStats = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const all = await ctx.db.query("moderators").collect();
     return {
       total: all.length,
@@ -82,6 +91,7 @@ export const createUser = mutation({
   },
   returns: v.id("moderators"),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     // Check for existing user with same email
     const existing = await ctx.db
       .query("moderators")
@@ -124,6 +134,7 @@ export const updateUser = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, ...updates }) => {
+    await requireAdmin(ctx);
     const user = await ctx.db.get(id);
     if (!user) throw new Error("User not found");
 
@@ -154,6 +165,7 @@ export const deleteUser = mutation({
   args: { id: v.id("moderators") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
     const user = await ctx.db.get(id);
     if (!user) throw new Error("User not found");
 
@@ -176,6 +188,7 @@ export const reactivateUser = mutation({
   args: { id: v.id("moderators") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
     const user = await ctx.db.get(id);
     if (!user) throw new Error("User not found");
 
@@ -197,6 +210,7 @@ export const deleteAccount = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     // This is a placeholder — actual auth deletion would need @convex-dev/auth
     // For now, just return null to satisfy the SettingsPage reference
     return null;
@@ -213,6 +227,7 @@ export const logActivity = mutation({
   },
   returns: v.id("moderatorActivity"),
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     const user = await ctx.db.get(args.moderatorId);
     if (!user) throw new Error("User not found");
 
