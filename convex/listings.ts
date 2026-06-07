@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireModeratorOrSystem } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -131,9 +132,12 @@ export const create = mutation({
     chatGptImageType: v.optional(v.string()),
     rawData: v.optional(v.any()),
     batchId: v.optional(v.string()),
+    // Trusted-pipeline key (HTTP push / scheduled enrichment). Never persisted.
+    systemKey: v.optional(v.string()),
   },
   returns: v.id("listings"),
-  handler: async (ctx, args) => {
+  handler: async (ctx, { systemKey, ...args }) => {
+    await requireModeratorOrSystem(ctx, systemKey);
     // Check for existing listing with same jeId
     const existing = await ctx.db
       .query("listings")
@@ -168,9 +172,11 @@ export const patchVisionScores = mutation({
     chatGptWatermarkText: v.optional(v.string()),
     chatGptImageQuality: v.optional(v.string()),
     chatGptImageType: v.optional(v.string()),
+    systemKey: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...scores }) => {
+  handler: async (ctx, { id, systemKey, ...scores }) => {
+    await requireModeratorOrSystem(ctx, systemKey);
     // Only patch non-null values
     const patch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(scores)) {
@@ -197,9 +203,11 @@ export const patchAccuracyData = mutation({
     accuracyAction: v.optional(v.string()),
     accuracyScannedAt: v.optional(v.number()),
     accuracySourceUpdatedAt: v.optional(v.number()),
+    systemKey: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...data }) => {
+  handler: async (ctx, { id, systemKey, ...data }) => {
+    await requireModeratorOrSystem(ctx, systemKey);
     const patch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
@@ -243,9 +251,11 @@ export const patch = mutation({
     officeSubscription: v.optional(v.string()),
     listingUrl: v.optional(v.string()),
     pricePerSqm: v.optional(v.number()),
+    systemKey: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...data }) => {
+  handler: async (ctx, { id, systemKey, ...data }) => {
+    await requireModeratorOrSystem(ctx, systemKey);
     const patchData: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
@@ -263,9 +273,11 @@ export const updateStatus = mutation({
   args: {
     id: v.id("listings"),
     status: v.string(),
+    systemKey: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { id, status }) => {
+  handler: async (ctx, { id, status, systemKey }) => {
+    await requireModeratorOrSystem(ctx, systemKey);
     await ctx.db.patch(id, { moderationStatus: status });
     return null;
   },

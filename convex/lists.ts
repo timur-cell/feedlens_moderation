@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ export const create = mutation({
   },
   returns: v.id("moderationLists"),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     return await ctx.db.insert("moderationLists", {
       ...args,
       itemCount: args.items.length,
@@ -98,6 +100,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, ...updates }) => {
+    await requireAdmin(ctx);
     const filtered: Record<string, any> = {};
     for (const [k, val] of Object.entries(updates)) {
       if (val !== undefined) filtered[k] = val;
@@ -123,6 +126,7 @@ export const addItem = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, item }) => {
+    await requireAdmin(ctx);
     const list = await ctx.db.get(id);
     if (!list) return null;
     const newItems = [...list.items, item];
@@ -142,6 +146,7 @@ export const removeItem = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, itemIndex }) => {
+    await requireAdmin(ctx);
     const list = await ctx.db.get(id);
     if (!list) return null;
     const newItems = list.items.filter((_: any, i: number) => i !== itemIndex);
@@ -158,6 +163,7 @@ export const remove = mutation({
   args: { id: v.id("moderationLists") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
     await ctx.db.delete(id);
     return null;
   },

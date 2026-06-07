@@ -1,8 +1,13 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { requireModeratorAction } from "./authz";
 
 declare const process: { env: Record<string, string | undefined> };
+
+// Minimum confidence for a remediation suggestion to be kept. Must match the
+// ">0.75 confidence" instruction and the 0.75-1.0 range in the prompt below.
+const MIN_SUGGESTION_CONFIDENCE = 0.75;
 
 // ─── Error Type Definitions ──────────────────────────────────────
 
@@ -170,7 +175,7 @@ async function callClaude(
   // Validate & filter low-confidence suggestions
   if (!Array.isArray(result.suggestions)) result.suggestions = [];
   result.suggestions = result.suggestions.filter(
-    (s) => (s.confidence || 0) >= 0.7
+    (s) => (s.confidence || 0) >= MIN_SUGGESTION_CONFIDENCE
   );
   result.errorCount = result.suggestions.length;
   result.hasFixableErrors = result.errorCount > 0;
@@ -233,6 +238,7 @@ export const scanListing = action({
   args: { listingId: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { listingId }): Promise<any> => {
+    await requireModeratorAction(ctx);
     const listing = await ctx.runQuery(internal.remediation.getListingInternal, {
       id: listingId,
     });
@@ -269,6 +275,7 @@ export const batchScan = action({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }): Promise<any> => {
+    await requireModeratorAction(ctx);
     const batchSize = limit || 20;
     const listings = await ctx.runQuery(
       internal.remediation.getUnscannedListings,
@@ -357,43 +364,51 @@ export const getUnscannedListings = internalQuery({
   args: { limit: v.number() },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
-    // Only pick listings that had moderation issues (rejected, notice, manual)
-    const moderationResults = await ctx.db
-      .query("moderationResults")
-      .withIndex("by_processedAt")
-      .order("desc")
-      .take(500);
+    // Find listings that had moderation issues (non-approved outcome or rule
+    // matches) and have NOT yet been remediation-scanned. We page through
+    // moderationResults oldest-first so repeated batchScan runs progressively
+    // drain the whole backlog instead of being permanently capped to a recent
+    // window. A safety bound limits how much a single call will scan.
+    const MAX_RESULTS_SCANNED = 5000;
+    const unscanned: any[] = [];
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let scanned = 0;
 
-    // Filter to listings with rule matches or non-approved outcomes
-    const listingIdsWithIssues = new Set<string>();
-    for (const mr of moderationResults) {
-      const hasIssues =
-        mr.outcome !== "approved" ||
-        (mr.ruleMatches && mr.ruleMatches.length > 0);
-      if (hasIssues) {
-        listingIdsWithIssues.add(mr.listingId as string);
-      }
-    }
+    while (unscanned.length < limit && scanned < MAX_RESULTS_SCANNED) {
+      const page = await ctx.db
+        .query("moderationResults")
+        .withIndex("by_processedAt")
+        .order("asc")
+        .paginate({ cursor, numItems: 200 });
 
-    const unscanned = [];
-    for (const lid of listingIdsWithIssues) {
-      try {
-        const listingId = lid as typeof moderationResults[0]["listingId"];
-        // Check if already remediation-scanned
+      for (const mr of page.page) {
+        scanned++;
+        const hasIssues =
+          mr.outcome !== "approved" ||
+          (mr.ruleMatches && mr.ruleMatches.length > 0);
+        if (!hasIssues) continue;
+
+        const lid = mr.listingId as string;
+        if (seen.has(lid)) continue;
+        seen.add(lid);
+
+        // Skip listings that already have a remediation scan.
         const scan = await ctx.db
           .query("remediationResults")
-          .withIndex("by_listing", (q) => q.eq("listingId", listingId))
+          .withIndex("by_listing", (q) => q.eq("listingId", mr.listingId))
           .first();
         if (scan) continue;
 
-        const listing = await ctx.db.get(listingId);
+        const listing = await ctx.db.get(mr.listingId);
         if (listing) {
           unscanned.push(listing);
           if (unscanned.length >= limit) break;
         }
-      } catch {
-        // Skip invalid IDs
       }
+
+      if (page.isDone) break;
+      cursor = page.continueCursor;
     }
     return unscanned;
   },

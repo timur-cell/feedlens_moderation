@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { requireModerator, requireModeratorAction } from "./authz";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -779,6 +780,11 @@ export const moderateListing = action({
   args: { listingId: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { listingId }): Promise<any> => {
+    await requireModeratorAction(ctx);
+
+    // Admin-configurable AI settings (model, temperature, thresholds, toggle).
+    const aiSettings: any = await ctx.runQuery(api.settings.getAiSettings, {});
+
     // 0. Run AI Parameter Scan (non-blocking — runs in background, doesn't affect moderation outcome)
     try {
       await ctx.runAction(api.aiParamScan.scanListingParameters, { listingId });
@@ -864,10 +870,30 @@ export const moderateListing = action({
       return { outcome: "rejected", resultId, ruleMatches, llmTriggered: false };
     }
 
-    // Check for auto-approve (e.g. outdated_paid_approve)
+    // Check for auto-approve (e.g. outdated_paid_approve). A deterministic
+    // tier:auto/action:approve rule short-circuits to approval (mirroring the
+    // auto-reject path above) so its seller message is preserved and the
+    // listing is not sent on to the LLM/manual queue by a co-matching rule.
     const autoApproves = ruleMatches.filter(
       (m) => m.tier === "auto" && m.action === "approve"
     );
+    if (autoApproves.length > 0) {
+      const sellerMsg = autoApproves.map((a) => a.message).filter(Boolean).join("\n");
+      const resultId: any = await ctx.runMutation(internal.moderation.saveResult, {
+        listingId,
+        jeId: listing.jeId,
+        outcome: "approved",
+        ruleMatches,
+        llmTriggered: false,
+        sellerMessage: sellerMsg || undefined,
+        confidence: 1.0,
+      });
+      if (matchedRuleIds.length > 0) {
+        await ctx.runMutation(internal.moderation.updateRuleStats, { ruleIds: matchedRuleIds });
+      }
+      await submitToImplio(listing, "approved", ruleMatches, sellerMsg || undefined, 1.0);
+      return { outcome: "approved", resultId, ruleMatches, llmTriggered: false };
+    }
 
     // Check for auto-notices from deterministic rules
     const autoNotices = ruleMatches.filter(
@@ -978,7 +1004,10 @@ export const moderateListing = action({
 
       if (hasLlmKey) {
         try {
-          llmResponse = await callLlm(listing, ruleMatches);
+          llmResponse = await callLlm(listing, ruleMatches, {
+            model: aiSettings.paramScanModel || "claude-haiku-4-5-20251001",
+            temperature: typeof aiSettings.aiTemperature === "number" ? aiSettings.aiTemperature : 0.1,
+          });
         } catch (e) {
           console.error("LLM call failed, routing to manual:", e);
           llmResponse = null;
@@ -986,8 +1015,23 @@ export const moderateListing = action({
       }
 
       if (llmResponse) {
-        // Confidence routing: ≥90% = automated, <90% = manual queue
-        const isHighConfidence = llmResponse.confidence >= 0.9;
+        // Confidence routing using admin-configurable thresholds. Guard against a
+        // malformed/missing confidence (e.g. the model returns a string like
+        // "high" or a 0-100 integer): only a finite number in [0,1] can drive an
+        // automated decision; anything else — or a disabled auto-moderation
+        // toggle — routes the listing to the manual queue.
+        const rawConfidence: any = llmResponse.confidence;
+        const confidence =
+          typeof rawConfidence === "number" && isFinite(rawConfidence) && rawConfidence >= 0 && rawConfidence <= 1
+            ? rawConfidence
+            : 0;
+        const approveThreshold =
+          typeof aiSettings.autoApproveThreshold === "number" ? aiSettings.autoApproveThreshold : 0.9;
+        const rejectThreshold =
+          typeof aiSettings.autoRejectThreshold === "number" ? aiSettings.autoRejectThreshold : 0.85;
+        const threshold = llmResponse.recommendation === "reject" ? rejectThreshold : approveThreshold;
+        const isHighConfidence =
+          aiSettings.enableAutoModeration !== false && confidence >= threshold;
 
         ruleMatches.push({
           ruleName: "llm_assessment",
@@ -1010,12 +1054,12 @@ export const moderateListing = action({
               llmTriggered: true,
               llmResponse,
               sellerMessage: rejectMsg,
-              confidence: llmResponse.confidence,
+              confidence,
             });
             if (matchedRuleIds.length > 0) {
               await ctx.runMutation(internal.moderation.updateRuleStats, { ruleIds: matchedRuleIds });
             }
-            await submitToImplio(listing, "rejected", ruleMatches, rejectMsg, llmResponse.confidence);
+            await submitToImplio(listing, "rejected", ruleMatches, rejectMsg, confidence);
             return { outcome: "rejected", resultId, ruleMatches, llmTriggered: true, llmResponse };
           }
           // High confidence approve with possible notice
@@ -1028,12 +1072,12 @@ export const moderateListing = action({
               llmTriggered: true,
               llmResponse,
               sellerMessage: llmResponse.notice,
-              confidence: llmResponse.confidence,
+              confidence,
             });
             if (matchedRuleIds.length > 0) {
               await ctx.runMutation(internal.moderation.updateRuleStats, { ruleIds: matchedRuleIds });
             }
-            await submitToImplio(listing, "notice", ruleMatches, llmResponse.notice, llmResponse.confidence);
+            await submitToImplio(listing, "notice", ruleMatches, llmResponse.notice, confidence);
             return { outcome: "notice", resultId, ruleMatches, llmTriggered: true, llmResponse };
           }
 
@@ -1046,12 +1090,12 @@ export const moderateListing = action({
             ruleMatches,
             llmTriggered: true,
             llmResponse,
-            confidence: llmResponse.confidence,
+            confidence,
           });
           if (matchedRuleIds.length > 0) {
             await ctx.runMutation(internal.moderation.updateRuleStats, { ruleIds: matchedRuleIds });
           }
-          await submitToImplio(listing, "approved", ruleMatches, undefined, llmResponse.confidence);
+          await submitToImplio(listing, "approved", ruleMatches, undefined, confidence);
           return { outcome: "approved", resultId, ruleMatches, llmTriggered: true, llmResponse };
         } else {
           // <90% confidence → manual queue in FeedLens
@@ -1062,12 +1106,12 @@ export const moderateListing = action({
             ruleMatches,
             llmTriggered: true,
             llmResponse,
-            confidence: llmResponse.confidence,
+            confidence,
           });
           if (matchedRuleIds.length > 0) {
             await ctx.runMutation(internal.moderation.updateRuleStats, { ruleIds: matchedRuleIds });
           }
-          await submitToImplio(listing, "manual", ruleMatches, undefined, llmResponse.confidence);
+          await submitToImplio(listing, "manual", ruleMatches, undefined, confidence);
           return { outcome: "manual", resultId, ruleMatches, llmTriggered: true, llmResponse };
         }
       } else {
@@ -1189,7 +1233,10 @@ async function submitToImplio(
     number_of_pictures: listing.imageCount,
     description_length: listing.descriptionLength,
     listing_quality_index: listing.lqi,
-    office_group_name: listing.officeGroupName || listing.office,
+    // Only the human-readable group name belongs here. listing.office holds a
+    // numeric office id (set from item.office_id by the push pipeline); sending
+    // that id would never match Implio's office-name rules, so omit it.
+    office_group_name: listing.officeGroupName || undefined,
     office_subscription_level: listing.officeSubscription,
     listing_feed_source: listing.feedSource,
     // ChatGPT vision fields (from JE pipeline)
@@ -1263,7 +1310,8 @@ async function submitToImplio(
 
 async function callLlm(
   listing: ListingData,
-  existingMatches: RuleMatch[]
+  existingMatches: RuleMatch[],
+  opts: { model: string; temperature: number }
 ): Promise<{
   scores: { condition?: number; watermark?: boolean; quality?: number; policyOk?: boolean };
   assessment: string;
@@ -1301,7 +1349,7 @@ ${listing.bathrooms ? `- Bathrooms: ${listing.bathrooms}` : ""}
 ${listing.office ? `- Office: ${listing.officeGroupName || listing.office}` : ""}
 ${listing.feedSource ? `- Feed source: ${listing.feedSource}` : ""}
 ${listing.chatGptConclusion ? `- Existing GPT assessment: ${listing.chatGptConclusion}` : ""}
-${listing.chatGptPropertyCondition ? `- GPT condition score: ${listing.chatGptPropertyCondition}/5` : ""}
+${listing.chatGptPropertyCondition != null ? `- GPT condition score: ${listing.chatGptPropertyCondition}/5${listing.chatGptPropertyCondition === 0 ? " (unidentifiable)" : ""}` : ""}
 
 FLAGGED RULES TO VERIFY:
 ${triggeredRules || "None"}
@@ -1349,9 +1397,9 @@ Respond with ONLY valid JSON (no markdown):
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: opts.model,
       max_tokens: 500,
-      temperature: 0.1,
+      temperature: opts.temperature,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -1370,7 +1418,7 @@ Respond with ONLY valid JSON (no markdown):
     const parsed = JSON.parse(cleaned);
     return {
       ...parsed,
-      model: "claude-haiku-4-5-20251001",
+      model: opts.model,
       tokensUsed,
     };
   } catch {
@@ -1379,7 +1427,7 @@ Respond with ONLY valid JSON (no markdown):
       assessment: content.substring(0, 500),
       recommendation: "manual",
       confidence: 0.3,
-      model: "claude-haiku-4-5-20251001",
+      model: opts.model,
       tokensUsed,
     };
   }
@@ -1398,6 +1446,7 @@ export const overrideDecision = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { resultId, newOutcome, reason, sellerMessage, overriddenBy, refuseReasonType }) => {
+    await requireModerator(ctx);
     const result = await ctx.db.get(resultId);
     if (!result) throw new Error("Result not found");
 
@@ -1637,6 +1686,7 @@ export const overrideWithImplio = action({
   },
   returns: v.any(),
   handler: async (ctx, args) => {
+    await requireModeratorAction(ctx);
     // 1. Run the DB override mutation
     await ctx.runMutation(api.moderation.overrideDecision, {
       resultId: args.resultId,

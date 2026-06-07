@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { requireModeratorAction } from "./authz";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -303,6 +304,14 @@ export const scanListingParameters = action({
   },
   returns: v.any(),
   handler: async (ctx, { listingId, forceRescan }): Promise<any> => {
+    await requireModeratorAction(ctx);
+
+    // Admin-configurable scan model / temperature.
+    const aiSettings: any = await ctx.runQuery(api.settings.getAiSettings, {});
+    const scanModel: string = aiSettings.paramScanModel || "claude-haiku-4-5-20251001";
+    const scanTemperature: number =
+      typeof aiSettings.aiTemperature === "number" ? aiSettings.aiTemperature : 0.1;
+
     // Get listing
     const listing = await ctx.runQuery(internal.aiParamScan.getListingInternal, { id: listingId });
     if (!listing) throw new Error("Listing not found");
@@ -454,9 +463,9 @@ If everything looks fine, return:
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: scanModel,
           max_tokens: 600,
-          temperature: 0.1,
+          temperature: scanTemperature,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -469,7 +478,7 @@ If everything looks fine, return:
       const textBlock = data.content?.find((b: any) => b.type === "text");
       const content = textBlock?.text || "";
       tokensUsed = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
-      modelUsed = "deterministic+claude-haiku-4-5-20251001";
+      modelUsed = `deterministic+${scanModel}`;
 
       try {
         const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -692,6 +701,7 @@ export const batchScanListings = action({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }): Promise<any> => {
+    await requireModeratorAction(ctx);
     const batchSize = limit || 20;
     // Get recent listings that haven't been scanned yet
     const listings = await ctx.runQuery(internal.aiParamScan.getUnscannedListings, { limit: batchSize });

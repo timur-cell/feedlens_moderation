@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireModerator } from "./authz";
 
 // ─── List notes for a listing ──────────────────────────────────
 
@@ -27,6 +28,7 @@ export const add = mutation({
   },
   returns: v.id("moderationNotes"),
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     return await ctx.db.insert("moderationNotes", {
       ...args,
       createdAt: Date.now(),
@@ -40,6 +42,7 @@ export const remove = mutation({
   args: { id: v.id("moderationNotes") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    await requireModerator(ctx);
     await ctx.db.delete(id);
     return null;
   },

@@ -1,6 +1,7 @@
 "use node";
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { requireAdminAction } from "./authz";
 
 // ─── AI-Assisted List Generation ─────────────────────────────────
 
@@ -9,7 +10,8 @@ export const suggestList = action({
     description: v.string(),
   },
   returns: v.any(),
-  handler: async (_ctx, { description }) => {
+  handler: async (ctx, { description }) => {
+    await requireAdminAction(ctx);
     const apiKey = process.env.ANTHROPIC_API_KEY || (await import("./serverConfig")).config.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("No Anthropic API key configured");
 
