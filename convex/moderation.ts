@@ -106,7 +106,7 @@ const REGION_TO_COUNTRY_CODE: Record<string, string> = {
 const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   // Full name → ISO code (lowercase keys for case-insensitive matching)
   "spain": "ES", "italy": "IT", "portugal": "PT", "france": "FR", "greece": "GR",
-  "united states": "US", "usa": "US", "united kingdom": "UK", "uk": "UK",
+  "united states": "US", "usa": "US", "united kingdom": "GB", "uk": "GB",
   "germany": "DE", "austria": "AT", "switzerland": "CH", "netherlands": "NL",
   "belgium": "BE", "sweden": "SE", "norway": "NO", "denmark": "DK", "finland": "FI",
   "ireland": "IE", "croatia": "HR", "turkey": "TR", "cyprus": "CY", "malta": "MT",
@@ -139,30 +139,47 @@ for (const [name, code] of Object.entries(COUNTRY_NAME_TO_CODE)) {
  * Check if a listing's country matches a countryFilter array.
  * Handles both ISO codes (ES, PT) and full names (Spain, Portugal).
  */
+// "UK" is a common alias for the ISO code "GB" — normalize so filters using
+// either spelling match listings using the other.
+function normCountryCode(code: string): string {
+  const uc = code.toUpperCase();
+  return uc === "UK" ? "GB" : uc;
+}
+
+// Best-effort country → ISO code normalization for other modules
+// (e.g. aiParamScan's high-cost-country thresholds).
+export function toCountryCode(country: string): string {
+  const trimmed = (country || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.length <= 3) return normCountryCode(trimmed);
+  const lower = trimmed.toLowerCase();
+  return COUNTRY_NAME_TO_CODE[lower] || REGION_TO_COUNTRY_CODE[lower] || trimmed.toUpperCase();
+}
+
 function countryMatches(listingCountry: string | undefined, filterValues: string[]): boolean {
   if (!listingCountry) return false;
   const lc = listingCountry.trim();
   const lcLower = lc.toLowerCase();
-  
+
   // Direct match (exact or case-insensitive)
   if (filterValues.some(f => f.toLowerCase() === lcLower || f === lc)) return true;
-  
+
   // Listing has full name → normalize to code and check
   const code = COUNTRY_NAME_TO_CODE[lcLower];
-  if (code && filterValues.some(f => f.toUpperCase() === code)) return true;
-  
+  if (code && filterValues.some(f => normCountryCode(f) === code)) return true;
+
   // Listing has code → check against full names in filter
   const ucLc = lc.toUpperCase();
   if (ucLc.length <= 3) {
-    const canonicalName = COUNTRY_CODE_TO_NAME[ucLc];
+    const canonicalName = COUNTRY_CODE_TO_NAME[normCountryCode(ucLc)];
     if (canonicalName && filterValues.some(f => f.toLowerCase() === canonicalName)) return true;
-    if (filterValues.some(f => f.toUpperCase() === ucLc)) return true;
+    if (filterValues.some(f => normCountryCode(f) === normCountryCode(ucLc))) return true;
   }
-  
+
   // Region fallback: "Algarve" → PT, "Balearic Islands" → ES, etc.
   const regionCode = REGION_TO_COUNTRY_CODE[lcLower];
-  if (regionCode && filterValues.some(f => f.toUpperCase() === regionCode)) return true;
-  
+  if (regionCode && filterValues.some(f => normCountryCode(f) === regionCode)) return true;
+
   return false;
 }
 
@@ -193,6 +210,10 @@ function evaluateSimpleRule(listing: ListingData, config: RuleConfig): { matched
       .replace("listing::", "")
       .replace("realestate", "real_estate")
       .replace(/^car$/i, "cars");
+    // Empty category must not pass: ""'s substring check matches any filter.
+    if (!cat) {
+      return { matched: false, details: `category unknown, filter ${config.categoryFilter}` };
+    }
     if (!config.categoryFilter.some((f: string) => {
       const normFilter = f.toLowerCase();
       return cat.includes(normFilter) || normFilter.includes(cat);
@@ -294,17 +315,29 @@ function evaluateSimpleRule(listing: ListingData, config: RuleConfig): { matched
     }
   }
 
+  // Feed source filter
+  if (config.feedSourceFilter && Array.isArray(config.feedSourceFilter)) {
+    const src = (listing.feedSource || "").toLowerCase();
+    if (!src || !config.feedSourceFilter.some((f: string) => src.includes(f.toLowerCase()))) {
+      return { matched: false, details: `feedSource ${listing.feedSource || "unknown"} not in ${config.feedSourceFilter}` };
+    }
+    filterChecks.push(`feedSource=${src} ✓`);
+  }
+
   // ─── Evaluate conditions ───
   let conditionsMet = true;
   const condDetails: string[] = [...filterChecks];
 
-  // AND conditions
+  // Conditions: AND by default, OR when requireAll === false
   if (config.conditions) {
     const results = config.conditions.map((c: { field: string; operator: string; value: unknown }) => {
       const val = listing[c.field as keyof ListingData];
       return evaluateCondition(val, c.operator, c.value);
     });
-    if (!results.every((r: boolean) => r)) conditionsMet = false;
+    const met = config.requireAll === false
+      ? results.some((r: boolean) => r)
+      : results.every((r: boolean) => r);
+    if (!met) conditionsMet = false;
     condDetails.push(
       ...config.conditions.map((c: { field: string; operator: string; value: unknown }, i: number) =>
         `${c.field} ${c.operator} ${c.value}: ${results[i] ? "✓" : "✗"}`
@@ -379,6 +412,14 @@ function evaluateCondition(value: unknown, operator: string, target: unknown): b
       return Array.isArray(target) && !target.map((t: unknown) => String(t).toLowerCase()).includes(String(value).toLowerCase());
     case "contains":
       return String(value).toLowerCase().includes(String(target).toLowerCase());
+    case "not_contains":
+      return !String(value).toLowerCase().includes(String(target).toLowerCase());
+    case "matches":
+      try {
+        return new RegExp(String(target), "i").test(String(value));
+      } catch {
+        return false; // invalid regex in rule config
+      }
     case "empty":
       return !value || (typeof value === "string" && value.trim() === "");
     case "not_empty":
@@ -397,7 +438,8 @@ function evaluateRegexRule(listing: ListingData, config: RuleConfig): { matched:
   if (config.categoryFilter && Array.isArray(config.categoryFilter)) {
     const rawCat = (listing.category || "").toLowerCase();
     const cat = rawCat.replace("listing::", "").replace("realestate", "real_estate").replace(/^car$/i, "cars");
-    if (!config.categoryFilter.some((f: string) => { const nf = f.toLowerCase(); return cat.includes(nf) || nf.includes(cat); })) {
+    // Empty category must not pass: ""'s substring check matches any filter.
+    if (!cat || !config.categoryFilter.some((f: string) => { const nf = f.toLowerCase(); return cat.includes(nf) || nf.includes(cat); })) {
       return { matched: false, details: `category ${listing.category} not in ${config.categoryFilter}`, matchedPatterns: [] };
     }
   }
@@ -510,7 +552,8 @@ function evaluateHybridVisionRule(listing: ListingData, config: RuleConfig): { m
   if (config.categoryFilter && Array.isArray(config.categoryFilter)) {
     const rawCat = (listing.category || "").toLowerCase();
     const cat = rawCat.replace("listing::", "").replace("realestate", "real_estate").replace(/^car$/i, "cars");
-    if (!config.categoryFilter.some((f: string) => { const nf = f.toLowerCase(); return cat.includes(nf) || nf.includes(cat); })) {
+    // Empty category must not pass: ""'s substring check matches any filter.
+    if (!cat || !config.categoryFilter.some((f: string) => { const nf = f.toLowerCase(); return cat.includes(nf) || nf.includes(cat); })) {
       return { matched: false, details: `category ${listing.category} not in ${config.categoryFilter}` };
     }
   }
@@ -690,21 +733,97 @@ function evaluateAccuracyRule(listing: ListingData, config: RuleConfig): { match
 
 function evaluateOfficeRule(listing: ListingData, config: RuleConfig): { matched: boolean; details: string } {
   const officeNames = (config.officeNames || []).map((n: string) => n.toLowerCase());
-  const officeIds = config.officeIds || [];
+  // Normalize to strings — configs may store numeric ids while the listing
+  // field is a string (or vice versa), and a mixed-type includes() never matches.
+  const officeIds = (config.officeIds || []).map((id) => String(id));
 
   const listingOffice = (listing.officeGroupName || listing.office || "").toLowerCase();
 
   if (officeNames.length > 0 && officeNames.some((n: string) => listingOffice.includes(n))) {
     return { matched: true, details: `Office "${listingOffice}" matches rule` };
   }
-  if (officeIds.length > 0 && officeIds.includes(listing.office || "")) {
+  if (officeIds.length > 0 && officeIds.includes(String(listing.office ?? ""))) {
     return { matched: true, details: `Office ID "${listing.office}" matches rule` };
   }
 
   return { matched: false, details: `Office "${listingOffice}" not in rule` };
 }
 
+// ─── Moderation List Resolution ──────────────────────────────────
+// Rules can reference moderationLists rows via config.listRef /
+// additionalListRef (match lists) and excludeListRef (exclusion list).
+// Resolve those references into the patterns/textLists/excludePatterns
+// shape the regex evaluator understands; without this step listRef rules
+// have no conditions at all and silently never match.
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+type ModListItem = { value: string; type?: string; pattern?: string; flags?: string };
+
+function resolveListRefs(
+  config: RuleConfig,
+  listsByName: Record<string, { items?: ModListItem[] } | undefined>,
+): RuleConfig {
+  const refNames = [config.listRef, config.additionalListRef].filter(
+    (n): n is string => typeof n === "string",
+  );
+  const excludeName = typeof config.excludeListRef === "string" ? config.excludeListRef : undefined;
+  if (refNames.length === 0 && !excludeName) return config;
+
+  const resolved: RuleConfig = { ...config };
+  const patterns: string[] = [...(config.patterns || [])];
+  const textLists: Record<string, string[]> = { ...(config.textLists || {}) };
+
+  for (const name of refNames) {
+    const list = listsByName[name];
+    if (!list) continue;
+    const words: string[] = [];
+    for (const item of list.items || []) {
+      if (item.type === "regex" && item.pattern) {
+        patterns.push(item.pattern);
+      } else if (item.value) {
+        words.push(item.value);
+      }
+    }
+    if (words.length > 0) textLists[name] = [...(textLists[name] || []), ...words];
+  }
+  if (patterns.length > 0) resolved.patterns = patterns;
+  if (Object.keys(textLists).length > 0) resolved.textLists = textLists;
+
+  if (excludeName) {
+    const list = listsByName[excludeName];
+    if (list) {
+      const excludePatterns: string[] = [...((config.excludePatterns as string[]) || [])];
+      for (const item of list.items || []) {
+        if (item.type === "regex" && item.pattern) excludePatterns.push(item.pattern);
+        else if (item.value) excludePatterns.push(escapeRegex(item.value));
+      }
+      if (excludePatterns.length > 0) resolved.excludePatterns = excludePatterns;
+    }
+  }
+
+  return resolved;
+}
+
 // ─── Internal functions ──────────────────────────────────────────
+
+export const getListsByNames = internalQuery({
+  args: { names: v.array(v.string()) },
+  returns: v.any(),
+  handler: async (ctx, { names }) => {
+    const results: Record<string, any> = {};
+    for (const name of names) {
+      const list = await ctx.db
+        .query("moderationLists")
+        .withIndex("by_name", (q) => q.eq("name", name))
+        .first();
+      if (list) results[name] = list;
+    }
+    return results;
+  },
+});
 
 export const getEnabledRules = internalQuery({
   args: {},
@@ -785,7 +904,9 @@ export const moderateListing = action({
     // Admin-configurable AI settings (model, temperature, thresholds, toggle).
     const aiSettings: any = await ctx.runQuery(api.settings.getAiSettings, {});
 
-    // 0. Run AI Parameter Scan (non-blocking — runs in background, doesn't affect moderation outcome)
+    // 0. Run AI Parameter Scan. Awaited on purpose: fetchAndModerate reads the
+    //    scan result immediately after moderation. Only its *failure* is
+    //    non-blocking — the scan doesn't affect the moderation outcome.
     try {
       await ctx.runAction(api.aiParamScan.scanListingParameters, { listingId });
     } catch (e) {
@@ -796,7 +917,26 @@ export const moderateListing = action({
     const listing: ListingData = await ctx.runQuery(internal.moderation.getListing, { id: listingId }) as ListingData;
     if (!listing) throw new Error("Listing not found");
 
-    const rules: Rule[] = (await ctx.runQuery(internal.moderation.getEnabledRules, {})) as Rule[];
+    let rules: Rule[] = (await ctx.runQuery(internal.moderation.getEnabledRules, {})) as Rule[];
+
+    // Resolve moderation-list references (listRef/additionalListRef/
+    // excludeListRef) into concrete patterns before evaluation.
+    const referencedListNames = [
+      ...new Set(
+        rules.flatMap((r) =>
+          [r.config.listRef, r.config.additionalListRef, r.config.excludeListRef].filter(
+            (n): n is string => typeof n === "string",
+          ),
+        ),
+      ),
+    ];
+    if (referencedListNames.length > 0) {
+      const listsByName: Record<string, any> = await ctx.runQuery(
+        internal.moderation.getListsByNames,
+        { names: referencedListNames },
+      );
+      rules = rules.map((r) => ({ ...r, config: resolveListRefs(r.config, listsByName) }));
+    }
 
     // Sort by priority
     rules.sort((a, b) => a.priority - b.priority);
@@ -829,8 +969,14 @@ export const moderateListing = action({
         }
         // Use dedicated vision rule evaluator for proper score/watermark/unidentifiable checks
         result = evaluateHybridVisionRule(listing, rule.config);
-      } else if (rule.config.officeFilter) {
+      } else if (rule.config.officeIds || rule.config.officeNames) {
+        // Only route to the office evaluator when the config uses the keys it
+        // reads. officeFilter-based rules fall through to evaluateSimpleRule,
+        // which implements officeFilter plus the rule's other conditions.
         result = evaluateOfficeRule(listing, rule.config);
+      } else if (rule.config.patterns || rule.config.textLists) {
+        // Deterministic rules with patterns or resolved listRef text lists
+        result = evaluateRegexRule(listing, rule.config);
       } else {
         result = evaluateSimpleRule(listing, rule.config);
       }
@@ -908,8 +1054,9 @@ export const moderateListing = action({
       (r) => r.category === "auto_ai" || r.category === "former_manual"
     );
     for (const rule of aiTriggerRules) {
-      // Use regex evaluator for rules with patterns, simple evaluator for conditions-only
-      const result = rule.config.patterns
+      // Use the regex evaluator for rules with patterns or resolved text
+      // lists, the simple evaluator for conditions-only rules
+      const result = rule.config.patterns || rule.config.textLists
         ? evaluateRegexRule(listing, rule.config)
         : evaluateSimpleRule(listing, rule.config);
       if (result.matched) {
@@ -955,23 +1102,29 @@ export const moderateListing = action({
 
           // Re-evaluate hybrid_vision rules now that we have vision data (single pass)
           const hybridRules = deterministicRules.filter((r) => r.category === "hybrid_vision");
+          const newHybridMatches: RuleMatch[] = [];
           for (const rule of hybridRules) {
             const result = evaluateHybridVisionRule(updatedListing, rule.config);
             if (result.matched) {
-              ruleMatches.push({
+              const match: RuleMatch = {
                 ruleName: rule.name,
                 ruleCategory: rule.category,
                 tier: rule.tier,
                 action: rule.action,
                 message: rule.sellerMessage,
                 details: `[Auto AI vision] ${result.details}`,
-              });
+              };
+              ruleMatches.push(match);
+              newHybridMatches.push(match);
               matchedRuleIds.push(rule._id);
             }
           }
 
-          // Check if newly-evaluated hybrid rules trigger immediate rejection
-          const newAutoRejects = ruleMatches.filter(
+          // Check if newly-evaluated hybrid rules trigger immediate rejection.
+          // Only the fresh hybrid matches qualify — the auto_ai matches that
+          // got us here must still go through LLM verification below, exactly
+          // as they would on a listing that already had vision data.
+          const newAutoRejects = newHybridMatches.filter(
             (m) => m.tier === "auto" && m.action === "reject"
           );
           if (newAutoRejects.length > 0) {
@@ -1025,19 +1178,26 @@ export const moderateListing = action({
           typeof rawConfidence === "number" && isFinite(rawConfidence) && rawConfidence >= 0 && rawConfidence <= 1
             ? rawConfidence
             : 0;
+        // Same guard for the recommendation: only a known value may drive an
+        // automated decision. An unexpected string (e.g. "Reject", "REJECT",
+        // garbage) is not === "reject" and would otherwise fall through to
+        // the auto-approve branch — route it to manual instead.
+        const rec = String(llmResponse.recommendation || "").trim().toLowerCase();
+        const validRecommendation = ["approve", "reject", "notice"].includes(rec);
+        if (validRecommendation) llmResponse.recommendation = rec;
         const approveThreshold =
           typeof aiSettings.autoApproveThreshold === "number" ? aiSettings.autoApproveThreshold : 0.9;
         const rejectThreshold =
           typeof aiSettings.autoRejectThreshold === "number" ? aiSettings.autoRejectThreshold : 0.85;
-        const threshold = llmResponse.recommendation === "reject" ? rejectThreshold : approveThreshold;
+        const threshold = rec === "reject" ? rejectThreshold : approveThreshold;
         const isHighConfidence =
-          aiSettings.enableAutoModeration !== false && confidence >= threshold;
+          validRecommendation && aiSettings.enableAutoModeration !== false && confidence >= threshold;
 
         ruleMatches.push({
           ruleName: "llm_assessment",
           ruleCategory: "auto_ai",
           tier: isHighConfidence ? "auto" : "manual",
-          action: llmResponse.recommendation || "flag",
+          action: validRecommendation ? rec : "flag",
           message: llmResponse.notice,
           details: llmResponse.assessment || "",
         });
@@ -1132,10 +1292,15 @@ export const moderateListing = action({
       }
     }
 
-    // 6. Check for manual-tier rule matches that still need human review
-    //    (Only rules with tier="manual" reach here — "verify" rules were handled by LLM above)
-    //    Note: if needsLlm was true, we already returned above. So llmResponse is always null here.
-    const manualMatches = ruleMatches.filter((m) => m.tier === "manual");
+    // 6. Check for matched rules that still need human review. Beyond
+    //    tier="manual", this catches deterministic matches the LLM never saw:
+    //    "verify"-tier simple/vision rules (only auto_ai/former_manual set
+    //    needsLlm) and auto-tier "flag" actions, which would otherwise fall
+    //    through to the all-clear approval below.
+    //    Note: if needsLlm was true, we already returned above.
+    const manualMatches = ruleMatches.filter(
+      (m) => m.tier === "manual" || m.tier === "verify" || m.action === "flag"
+    );
     if (manualMatches.length > 0) {
       const resultId: any = await ctx.runMutation(internal.moderation.saveResult, {
         listingId,
@@ -1216,10 +1381,19 @@ async function submitToImplio(
     ? assessmentLines.join("\n")
     : `FeedLens outcome: ${outcome}`;
 
+  // Derive the JE URL segment from the listing category — hardcoding
+  // /real_estate/ would give cars/yachts a wrong listing_url.
+  const categoryLower = String(listing.category || "").toLowerCase();
+  const urlSegment = categoryLower.includes("car")
+    ? "cars"
+    : categoryLower.includes("yacht")
+      ? "yachts"
+      : "real_estate";
+
   // Build customerSpecific with listing data + moderation flags
   const cs: Record<string, unknown> = {
     // Listing data fields (match Implio's expected field names)
-    listing_url: `https://www.jamesedition.com/real_estate/-/-${listing.jeId}`,
+    listing_url: `https://www.jamesedition.com/${urlSegment}/-/-${listing.jeId}`,
     price: listing.price,
     price_usd: listing.priceUsd,
     price_on_request: listing.priceOnRequest || false,
@@ -1446,15 +1620,17 @@ export const overrideDecision = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { resultId, newOutcome, reason, sellerMessage, overriddenBy, refuseReasonType }) => {
-    await requireModerator(ctx);
+    const moderator = await requireModerator(ctx);
     const result = await ctx.db.get(resultId);
     if (!result) throw new Error("Result not found");
 
-    // Save original outcome before override
+    // Save original outcome before override. Attribute it to the
+    // authenticated moderator — the client-supplied value (historically the
+    // constant "manual") would erase who made the decision from the audit log.
     const patch: Record<string, any> = {
       originalOutcome: result.outcome,
       outcome: newOutcome,
-      overriddenBy: overriddenBy || "manual",
+      overriddenBy: moderator.name || moderator.email || overriddenBy || "manual",
       overriddenAt: Date.now(),
       overrideReason: reason,
       sellerMessage: sellerMessage || result.sellerMessage,
@@ -1479,6 +1655,7 @@ export const getResultsForListing = query({
   args: { listingId: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { listingId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationResults")
       .withIndex("by_listing", (q) => q.eq("listingId", listingId))
@@ -1491,6 +1668,7 @@ export const getRecentResults = query({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationResults")
       .withIndex("by_processedAt")
@@ -1503,6 +1681,7 @@ export const getResultsByOutcome = query({
   args: { outcome: v.string(), limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { outcome, limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationResults")
       .withIndex("by_outcome", (q) => q.eq("outcome", outcome))
@@ -1520,6 +1699,7 @@ export const getDashboardStats = query({
   },
   returns: v.any(),
   handler: async (ctx, { startDate, endDate }) => {
+    await requireModerator(ctx);
     let results = await ctx.db
       .query("moderationResults")
       .withIndex("by_processedAt")
@@ -1622,6 +1802,7 @@ export const getResultsByRule = query({
   },
   returns: v.any(),
   handler: async (ctx, { ruleName, limit }) => {
+    await requireModerator(ctx);
     // Get all results and filter for ones containing this rule
     const allResults = await ctx.db
       .query("moderationResults")
@@ -1663,6 +1844,7 @@ export const getLatestResultByJeId = query({
   args: { jeId: v.string() },
   returns: v.any(),
   handler: async (ctx, { jeId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationResults")
       .withIndex("by_jeId", (q) => q.eq("jeId", jeId))
@@ -1686,14 +1868,17 @@ export const overrideWithImplio = action({
   },
   returns: v.any(),
   handler: async (ctx, args) => {
-    await requireModeratorAction(ctx);
+    const moderator = await requireModeratorAction(ctx);
+    // Attribute the override to the authenticated moderator, not the
+    // client-supplied label (historically the constant "manual").
+    const overriddenBy = moderator.name || moderator.email || args.overriddenBy || "moderator";
     // 1. Run the DB override mutation
     await ctx.runMutation(api.moderation.overrideDecision, {
       resultId: args.resultId,
       newOutcome: args.newOutcome,
       reason: args.reason,
       sellerMessage: args.sellerMessage,
-      overriddenBy: args.overriddenBy,
+      overriddenBy,
       refuseReasonType: args.refuseReasonType,
     });
 
@@ -1714,7 +1899,7 @@ export const overrideWithImplio = action({
         tier: "auto",
         action: args.newOutcome === "rejected" ? "reject" : args.newOutcome === "notice" ? "notice" : "approve",
         message: args.sellerMessage,
-        details: `Manual override by ${args.overriddenBy || "moderator"}. ${args.reason ? `Reason: ${args.reason}` : ""}`,
+        details: `Manual override by ${overriddenBy}. ${args.reason ? `Reason: ${args.reason}` : ""}`,
       },
     ];
 
@@ -1742,6 +1927,7 @@ export const exportCSV = query({
   },
   returns: v.any(),
   handler: async (ctx, { startDate, endDate }) => {
+    await requireModerator(ctx);
     let results = await ctx.db
       .query("moderationResults")
       .withIndex("by_processedAt")

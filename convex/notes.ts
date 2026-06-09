@@ -29,9 +29,13 @@ export const add = mutation({
   },
   returns: v.id("moderationNotes"),
   handler: async (ctx, args) => {
-    await requireModerator(ctx);
+    const moderator = await requireModerator(ctx);
     return await ctx.db.insert("moderationNotes", {
       ...args,
+      // Attribute to the authenticated moderator — the client-supplied name
+      // (historically a hardcoded "Test User") is only a fallback.
+      authorName: moderator.name || moderator.email || args.authorName,
+      authorRole: moderator.role || args.authorRole,
       createdAt: Date.now(),
     });
   },

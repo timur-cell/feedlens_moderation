@@ -8,6 +8,7 @@ export const list = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db.query("rules").collect();
   },
 });
@@ -16,6 +17,7 @@ export const getByCategory = query({
   args: { category: v.string() },
   returns: v.any(),
   handler: async (ctx, { category }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("rules")
       .withIndex("by_category", (q) => q.eq("category", category))
@@ -27,6 +29,7 @@ export const getEnabled = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("rules")
       .withIndex("by_enabled", (q) => q.eq("enabled", true))
@@ -40,6 +43,7 @@ export const getByListingCategory = query({
   args: { listingCategory: v.string() },
   returns: v.any(),
   handler: async (ctx, { listingCategory }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("rules")
       .withIndex("by_listingCategory", (q) => q.eq("listingCategory", listingCategory))

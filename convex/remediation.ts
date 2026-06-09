@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { requireModeratorAction } from "./authz";
+import { requireModerator, requireModeratorAction } from "./authz";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -209,11 +209,13 @@ function buildSaveArgs(
       currentValue: String(s.currentValue ?? ""),
       suggestedFix: String(s.suggestedFix ?? ""),
       explanation: String(s.explanation ?? ""),
-      confidence: s.confidence || 0,
+      // Coerce — the model occasionally returns numbers as strings, which
+      // would fail saveResult's v.number() validator and abort the scan.
+      confidence: Number(s.confidence) || 0,
     })),
     descriptionScore: result.descriptionScore
       ? {
-          overall: result.descriptionScore.overall || 0,
+          overall: Number(result.descriptionScore.overall) || 0,
           length: result.descriptionScore.length || "ok",
           hasPlaceholder: result.descriptionScore.hasPlaceholder || false,
           hasAllCaps: result.descriptionScore.hasAllCaps || false,
@@ -370,19 +372,25 @@ export const getUnscannedListings = internalQuery({
     // drain the whole backlog instead of being permanently capped to a recent
     // window. A safety bound limits how much a single call will scan.
     const MAX_RESULTS_SCANNED = 5000;
+    const PAGE_SIZE = 200;
     const unscanned: any[] = [];
     const seen = new Set<string>();
-    let cursor: string | null = null;
     let scanned = 0;
+    // Walk the by_processedAt index in ascending ranges. Convex permits only
+    // one .paginate() call per query execution, so a paginate loop would
+    // throw on the second page; an index-range walk has no such limit.
+    let lastProcessedAt = 0;
 
     while (unscanned.length < limit && scanned < MAX_RESULTS_SCANNED) {
+      const cutoff = lastProcessedAt;
       const page = await ctx.db
         .query("moderationResults")
-        .withIndex("by_processedAt")
+        .withIndex("by_processedAt", (q) => q.gt("processedAt", cutoff))
         .order("asc")
-        .paginate({ cursor, numItems: 200 });
+        .take(PAGE_SIZE);
+      if (page.length === 0) break;
 
-      for (const mr of page.page) {
+      for (const mr of page) {
         scanned++;
         const hasIssues =
           mr.outcome !== "approved" ||
@@ -407,8 +415,8 @@ export const getUnscannedListings = internalQuery({
         }
       }
 
-      if (page.isDone) break;
-      cursor = page.continueCursor;
+      lastProcessedAt = page[page.length - 1].processedAt;
+      if (page.length < PAGE_SIZE) break;
     }
     return unscanned;
   },
@@ -473,6 +481,7 @@ export const getStats = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const all = await ctx.db.query("remediationResults").collect();
     const withErrors = all.filter((r) => r.hasFixableErrors);
 
@@ -588,6 +597,7 @@ export const getRecent = query({
   args: { limit: v.optional(v.number()), errorsOnly: v.optional(v.boolean()) },
   returns: v.any(),
   handler: async (ctx, { limit, errorsOnly }) => {
+    await requireModerator(ctx);
     let results;
     if (errorsOnly) {
       results = await ctx.db
@@ -637,6 +647,7 @@ export const getByJeId = query({
   args: { jeId: v.string() },
   returns: v.any(),
   handler: async (ctx, { jeId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("remediationResults")
       .withIndex("by_jeId", (q) => q.eq("jeId", jeId))
@@ -648,6 +659,7 @@ export const getByFeedSource = query({
   args: { feedSource: v.string(), limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { feedSource, limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("remediationResults")
       .withIndex("by_feedSource", (q) => q.eq("feedSource", feedSource))

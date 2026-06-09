@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAdmin } from "./authz";
+import { requireAdmin, requireModerator } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -8,6 +8,7 @@ export const list = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db.query("moderationLists").collect();
   },
 });
@@ -16,6 +17,7 @@ export const getByName = query({
   args: { name: v.string() },
   returns: v.any(),
   handler: async (ctx, { name }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationLists")
       .withIndex("by_name", (q) => q.eq("name", name))
@@ -27,6 +29,7 @@ export const getByCategory = query({
   args: { category: v.string() },
   returns: v.any(),
   handler: async (ctx, { category }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationLists")
       .withIndex("by_category", (q) => q.eq("category", category))
@@ -38,6 +41,7 @@ export const getMultipleByNames = query({
   args: { names: v.array(v.string()) },
   returns: v.any(),
   handler: async (ctx, { names }) => {
+    await requireModerator(ctx);
     const results: Record<string, any> = {};
     for (const name of names) {
       const list = await ctx.db

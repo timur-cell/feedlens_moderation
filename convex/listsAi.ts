@@ -79,7 +79,7 @@ Generate a complete list. Respond with ONLY valid JSON (no markdown, no backtick
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "";
+    const text = data.content?.find((b: any) => b.type === "text")?.text || "";
 
     try {
       const suggestion = JSON.parse(text.trim());
