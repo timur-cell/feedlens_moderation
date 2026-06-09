@@ -8,6 +8,7 @@ export const listByListing = query({
   args: { listingId: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { listingId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("moderationNotes")
       .withIndex("by_listing", (q) => q.eq("listingId", listingId))
@@ -54,6 +55,7 @@ export const countByListing = query({
   args: { listingId: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { listingId }) => {
+    await requireModerator(ctx);
     const notes = await ctx.db
       .query("moderationNotes")
       .withIndex("by_listing", (q) => q.eq("listingId", listingId))

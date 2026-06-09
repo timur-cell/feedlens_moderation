@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { auth } from "./auth";
+import { timingSafeEqual } from "./authz";
 
 const http = httpRouter();
 
@@ -17,7 +18,20 @@ http.route({
     const url = new URL(request.url);
     const imageUrl = url.searchParams.get("url");
 
-    if (!imageUrl || !imageUrl.includes("jamesedition.com")) {
+    // Validate the parsed hostname, not the raw string — a substring check
+    // would let attacker-controlled URLs through (open proxy / SSRF), e.g.
+    // http://evil.com/?jamesedition.com
+    let target: URL;
+    try {
+      target = new URL(imageUrl ?? "");
+    } catch {
+      return new Response("Invalid or missing url parameter", { status: 400 });
+    }
+    if (
+      target.protocol !== "https:" ||
+      (target.hostname !== "jamesedition.com" &&
+        !target.hostname.endsWith(".jamesedition.com"))
+    ) {
       return new Response("Invalid or missing url parameter", { status: 400 });
     }
 
@@ -83,7 +97,7 @@ http.route({
     // Auth check
     const apiKey = process.env.LAS_PUSH_API_KEY;
     const provided = request.headers.get("X-Api-Key") || request.headers.get("x-api-key");
-    if (!apiKey || provided !== apiKey) {
+    if (!apiKey || !provided || !timingSafeEqual(provided, apiKey)) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },

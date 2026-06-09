@@ -3,9 +3,7 @@ import { v } from "convex/values";
 import { Scrypt } from "lucia";
 import { internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { DEFAULT_USER_PASSWORD } from "./serverConfig";
-
-const DEFAULT_PASSWORD = DEFAULT_USER_PASSWORD;
+import { getDefaultUserPassword } from "./serverConfig";
 
 /**
  * Create a user with auth account — called from admin panel.
@@ -26,7 +24,7 @@ export const createUserWithAuth = internalAction({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
-    const password = args.password || DEFAULT_PASSWORD;
+    const password = args.password || getDefaultUserPassword();
     const email = args.email.trim().toLowerCase();
 
     // 1. Create auth account (Convex Auth via "test" provider)

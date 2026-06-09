@@ -97,6 +97,18 @@ export async function requireModeratorOrSystem(
   systemKey: string | undefined,
 ): Promise<void> {
   const expected = process.env.LAS_PUSH_API_KEY;
-  if (systemKey && expected && systemKey === expected) return;
+  if (systemKey && expected && timingSafeEqual(systemKey, expected)) return;
   await requireModerator(ctx);
+}
+
+// Constant-time string comparison for API keys. Inspects every character
+// regardless of where the first mismatch occurs, so the comparison time
+// doesn't leak how much of the key an attacker guessed correctly.
+export function timingSafeEqual(a: string, b: string): boolean {
+  let diff = a.length ^ b.length;
+  const len = Math.max(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
 }

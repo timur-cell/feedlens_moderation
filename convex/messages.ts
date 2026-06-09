@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAdmin } from "./authz";
+import { requireAdmin, requireModerator } from "./authz";
 
 export const list = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db.query("messageTemplates").collect();
   },
 });
@@ -14,6 +15,7 @@ export const getByCategory = query({
   args: { category: v.string() },
   returns: v.any(),
   handler: async (ctx, { category }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("messageTemplates")
       .filter((q) => q.eq(q.field("category"), category))

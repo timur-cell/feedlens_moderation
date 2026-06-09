@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import { requireAdmin } from "./authz";
 
 // All 79 Implio rules mapped to FeedLens with proper categorization
 const ALL_RULES = [
@@ -1434,6 +1435,7 @@ const ALL_RULES = [
 export const seedAllRules = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     // Delete all existing rules
     const existing = await ctx.db.query("rules").collect();
     for (const rule of existing) {
