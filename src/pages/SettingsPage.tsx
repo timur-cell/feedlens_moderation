@@ -128,7 +128,9 @@ const ALL_COUNTRIES = [
   { code: "AU", name: "Australia" },
 ];
 
-const DEFAULT_PASSWORD = "je_feedlens2026_1";
+// Generate a fresh random password per dialog rather than shipping a fixed
+// default credential in the client bundle.
+const generatePassword = () => `fl-${crypto.randomUUID().replace(/-/g, "").slice(0, 14)}`;
 
 const roleConfig: Record<string, { label: string; icon: any; color: string; badgeClass: string }> = {
   admin: {
@@ -357,7 +359,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("moderator");
-  const [password, setPassword] = useState(DEFAULT_PASSWORD);
+  const [password, setPassword] = useState(generatePassword);
   const [created, setCreated] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -380,7 +382,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleClose = () => { setName(""); setEmail(""); setRole("moderator"); setPassword(DEFAULT_PASSWORD); setCreated(false); setCopied(false); onClose(); };
+  const handleClose = () => { setName(""); setEmail(""); setRole("moderator"); setPassword(generatePassword()); setCreated(false); setCopied(false); onClose(); };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -418,7 +420,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             <div>
               <label className="text-sm font-medium">Password</label>
               <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" type="text" className="mt-1 font-mono" />
-              <p className="text-xs text-muted-foreground mt-1">Default: <code className="bg-muted px-1 rounded">{DEFAULT_PASSWORD}</code></p>
+              <p className="text-xs text-muted-foreground mt-1">Randomly generated — edit to choose your own.</p>
             </div>
           </div>
         ) : (
@@ -451,7 +453,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
 function SetPasswordDialog({ open, onClose, user }: { open: boolean; onClose: () => void; user: { name: string; email: string } | null }) {
   const setUserPassword = useAction(api.adminUsers.setUserPassword);
-  const [password, setPassword] = useState(DEFAULT_PASSWORD);
+  const [password, setPassword] = useState(generatePassword);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -474,7 +476,7 @@ function SetPasswordDialog({ open, onClose, user }: { open: boolean; onClose: ()
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleClose = () => { setPassword(DEFAULT_PASSWORD); setDone(false); setCopied(false); onClose(); };
+  const handleClose = () => { setPassword(generatePassword()); setDone(false); setCopied(false); onClose(); };
 
   if (!user) return null;
 
@@ -490,7 +492,7 @@ function SetPasswordDialog({ open, onClose, user }: { open: boolean; onClose: ()
             <div>
               <label className="text-sm font-medium">New Password</label>
               <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" type="text" className="mt-1 font-mono" />
-              <p className="text-xs text-muted-foreground mt-1">Default: <code className="bg-muted px-1 rounded">{DEFAULT_PASSWORD}</code></p>
+              <p className="text-xs text-muted-foreground mt-1">Randomly generated — edit to choose your own.</p>
             </div>
           </div>
         ) : (
@@ -700,9 +702,10 @@ function AlertsSection() {
   const [notifEmail, setNotifEmail] = useState("");
   const [slackWebhook, setSlackWebhook] = useState("");
 
-  // Sync from server
+  // Sync from server — but never while the admin has unsaved edits, or any
+  // reactive settings update would silently discard them.
   useEffect(() => {
-    if (settings) {
+    if (settings && !dirty) {
       setVolumePerHour(settings.alertVolumePerHour);
       setVolumePerDay(settings.alertVolumePerDay);
       setScanFailures(settings.alertOnScanFailures);
@@ -713,7 +716,7 @@ function AlertsSection() {
       setSlackWebhook(settings.notificationSlackWebhook);
       setDirty(false);
     }
-  }, [settings]);
+  }, [settings, dirty]);
 
   const markDirty = () => setDirty(true);
 
@@ -918,9 +921,10 @@ function AIConfigSection() {
   const [autoMod, setAutoMod] = useState(true);
   const [newCountry, setNewCountry] = useState("");
 
-  // Sync from server
+  // Sync from server — but never while the admin has unsaved edits, or any
+  // reactive settings update would silently discard them.
   useEffect(() => {
-    if (settings) {
+    if (settings && !dirty) {
       setParamModel(settings.paramScanModel);
       setVisionModel(settings.visionModel);
       setCountries(settings.visionCountries || []);
@@ -931,7 +935,7 @@ function AIConfigSection() {
       setAutoMod(settings.enableAutoModeration);
       setDirty(false);
     }
-  }, [settings]);
+  }, [settings, dirty]);
 
   const markDirty = () => setDirty(true);
 

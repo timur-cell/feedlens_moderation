@@ -479,6 +479,16 @@ function ListingCard({ listing }: { listing: QueueListing }) {
 
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Reset dialog inputs on close — otherwise a canceled Reject leaves the
+  // refusal text in `message`, and a subsequent Approve would send it to the
+  // seller as sellerMessage.
+  const closeActionDialog = () => {
+    setActionDialog(null);
+    setMessage("");
+    setReason("");
+    setRefuseReasonType("other");
+  };
+
   const handleAction = async (action: "approved" | "rejected" | "notice") => {
     if (!result) {
       toast.error("No moderation result found for this listing");
@@ -491,15 +501,12 @@ function ListingCard({ listing }: { listing: QueueListing }) {
         resultId: result._id,
         newOutcome: action,
         reason: reason || undefined,
-        sellerMessage: message || undefined,
+        sellerMessage: action === "approved" ? undefined : message || undefined,
         overriddenBy: "manual",
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
       });
       toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"} — synced to Implio`);
-      setActionDialog(null);
-      setMessage("");
-      setReason("");
-      setRefuseReasonType("other");
+      closeActionDialog();
     } catch (err) {
       console.error("Override failed:", err);
       toast.error("Failed to update listing: " + (err instanceof Error ? err.message : "Unknown error"));
@@ -685,7 +692,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                 <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs space-y-2 border">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                     <div><span className="text-muted-foreground">JE ID:</span> <a href={`https://www.jamesedition.com/admin/listings/${listing.jeId}/edit`} target="_blank" rel="noopener noreferrer" className="font-mono text-primary hover:underline">{listing.jeId}</a></div>
-                    <div><span className="text-muted-foreground">Office ID:</span> {listing.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${listing.office}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
+                    <div><span className="text-muted-foreground">Office ID:</span> {listing.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${encodeURIComponent(listing.office)}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Avg img:</span> {listing.avgImageWidth != null && listing.avgImageHeight != null ? `${listing.avgImageWidth}×${listing.avgImageHeight}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Pre-owned:</span> {listing.preOwned != null ? (listing.preOwned ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Outdated:</span> {listing.outdated != null ? (listing.outdated ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
@@ -798,7 +805,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
       </Card>
 
       {/* Action Dialog with Refuse Reason Types */}
-      <Dialog open={!!actionDialog} onOpenChange={() => setActionDialog(null)}>
+      <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) closeActionDialog(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -889,7 +896,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActionDialog(null)}>
+            <Button variant="outline" onClick={closeActionDialog}>
               Cancel
             </Button>
             <Button

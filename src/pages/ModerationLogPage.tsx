@@ -309,7 +309,7 @@ function ResultRow({ result, listing, scan }: { result: any; listing: any; scan?
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">Seller</div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
-                <div><span className="text-muted-foreground">Office:</span> {listing?.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${listing.office}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
+                <div><span className="text-muted-foreground">Office:</span> {listing?.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${encodeURIComponent(listing.office)}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                 <div><span className="text-muted-foreground">Office Group:</span> {listing?.officeGroupName || <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                 <div><span className="text-muted-foreground">Plan:</span> {listing?.officeSubscription || <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                 <div><span className="text-muted-foreground">Feed:</span> {listing?.feedSource || <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>

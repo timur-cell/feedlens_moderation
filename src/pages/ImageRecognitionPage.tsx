@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import { api } from "../../convex/_generated/api";
@@ -793,9 +793,8 @@ function ManualImageAnalysis() {
                   const res = r.result || {};
                   const isExpanded = expandedId === r._id;
                   return (
-                    <>
+                    <Fragment key={r._id}>
                       <TableRow
-                        key={r._id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setExpandedId(isExpanded ? null : r._id)}
                       >
@@ -836,7 +835,7 @@ function ManualImageAnalysis() {
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
-                        <TableRow key={r._id + "-detail"}>
+                        <TableRow>
                           <TableCell colSpan={10} className="bg-muted/30 p-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
@@ -872,7 +871,7 @@ function ManualImageAnalysis() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>
