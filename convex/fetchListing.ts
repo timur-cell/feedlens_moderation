@@ -91,6 +91,10 @@ function parseMobileApiPrice(priceStr: string): { price: number; currency: strin
     } else {
       numStr = numStr.replace(/,/g, ''); // US
     }
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(numStr)) {
+    // European thousands separators only: 1.200.000 → 1200000.
+    // Without this, parseFloat("1.200.000") yields 1.2.
+    numStr = numStr.replace(/\./g, '');
   } else {
     numStr = numStr.replace(/[,\s]/g, '');
   }
@@ -546,7 +550,17 @@ export const fetchAndModerate = action({
               (a, b) => a.length - b.length || trimmed.lastIndexOf(a) - trimmed.lastIndexOf(b),
             ).pop() || "";
           }
-          url = trimmed;
+          // Only ever scrape jamesedition.com — fetching an arbitrary
+          // user-supplied URL server-side would be SSRF. For non-JE hosts the
+          // extracted id is kept and the canonical listing URL is used instead.
+          let host = "";
+          try {
+            host = new URL(trimmed).hostname;
+          } catch { /* unparseable — fall back to the canonical URL */ }
+          url =
+            host === "jamesedition.com" || host.endsWith(".jamesedition.com")
+              ? trimmed
+              : `https://www.jamesedition.com/listing/${jeId}`;
         } else {
           jeId = trimmed.replace(/\D/g, '');
           url = `https://www.jamesedition.com/listing/${jeId}`;
@@ -678,7 +692,7 @@ export const fetchAndModerate = action({
               tier: "manual",
               action: "flag",
               message: "⚠️ Data Fetch Failed — both JE Mobile API and HTML scraping returned errors. Cannot evaluate this listing without data.",
-              details: "Mobile API: HTTP 500; HTML: Cloudflare 403",
+              details: "All data sources failed (mobile API, search API, HTML scrape).",
             }],
             llmTriggered: false,
             confidence: 0,
@@ -790,7 +804,7 @@ export const enrichListing = internalAction({
       }
 
       // Get the existing listing
-      const existing = await ctx.runQuery(api.listings.getByJeId, { jeId });
+      const existing = await ctx.runQuery(internal.listings.getByJeIdInternal, { jeId });
       if (!existing) {
         return { success: false, error: "Listing not found in database" };
       }
@@ -801,9 +815,11 @@ export const enrichListing = internalAction({
           ? Math.round(listingData.price / listingData.livingArea)
           : undefined;
 
-      // Patch the listing with full data (only fill missing fields)
-      await ctx.runMutation(api.listings.patch, {
-        id: (existing as any)._id,
+      // Patch the listing with full data — only fill fields that are still
+      // missing, so enrichment never clobbers values the LAS push already set
+      // (e.g. the exact price derived from price_cents). The placeholder
+      // title from the minimal record is the one field we do replace.
+      const candidate: Record<string, unknown> = {
         title: listingData.title,
         price: listingData.price,
         currency: listingData.currency,
@@ -827,6 +843,19 @@ export const enrichListing = internalAction({
         officeSubscription: listingData.officeSubscription,
         listingUrl: listingData.listingUrl,
         pricePerSqm,
+      };
+      const patchArgs: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(candidate)) {
+        const current = (existing as any)[key];
+        const isPlaceholderTitle = key === "title" && current === `Listing ${jeId}`;
+        if (current == null || isPlaceholderTitle) {
+          patchArgs[key] = value;
+        }
+      }
+
+      await ctx.runMutation(api.listings.patch, {
+        ...(patchArgs as any),
+        id: (existing as any)._id,
         // Scheduled/internal context has no signed-in moderator — authorize the
         // write with the trusted-pipeline key.
         systemKey: process.env.LAS_PUSH_API_KEY,

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { requireModeratorOrSystem } from "./authz";
+import { internalQuery, mutation, query } from "./_generated/server";
+import { requireModerator, requireModeratorOrSystem } from "./authz";
 
 // ─── Queries ─────────────────────────────────────────────────────
 
@@ -8,11 +8,27 @@ export const getById = query({
   args: { id: v.id("listings") },
   returns: v.any(),
   handler: async (ctx, { id }) => {
+    await requireModerator(ctx);
     return await ctx.db.get(id);
   },
 });
 
 export const getByJeId = query({
+  args: { jeId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, { jeId }) => {
+    await requireModerator(ctx);
+    return await ctx.db
+      .query("listings")
+      .withIndex("by_jeId", (q) => q.eq("jeId", jeId))
+      .first();
+  },
+});
+
+// Identity-less twin of getByJeId for trusted pipeline callers (the
+// /api/push-flagged HTTP action and the scheduled enrichListing action),
+// which have no Convex Auth user to satisfy requireModerator.
+export const getByJeIdInternal = internalQuery({
   args: { jeId: v.string() },
   returns: v.any(),
   handler: async (ctx, { jeId }) => {
@@ -27,6 +43,7 @@ export const listPending = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("listings")
       .withIndex("by_status", (q) => q.eq("moderationStatus", "manual"))
@@ -39,6 +56,7 @@ export const listRecent = query({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("listings")
       .withIndex("by_importedAt")
@@ -51,6 +69,7 @@ export const listByStatus = query({
   args: { status: v.string(), limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { status, limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("listings")
       .withIndex("by_status", (q) => q.eq("moderationStatus", status))
@@ -63,6 +82,7 @@ export const listByBatch = query({
   args: { batchId: v.string() },
   returns: v.any(),
   handler: async (ctx, { batchId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("listings")
       .withIndex("by_batch", (q) => q.eq("batchId", batchId))
@@ -76,6 +96,7 @@ export const getStats = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const all = await ctx.db.query("listings").collect();
     const total = all.length;
     const approved = all.filter((l) => l.moderationStatus === "approved").length;

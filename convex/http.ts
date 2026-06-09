@@ -143,7 +143,7 @@ http.route({
         }
 
         // Look up existing listing in FeedLens
-        const existing = await ctx.runQuery(api.listings.getByJeId, { jeId });
+        const existing = await ctx.runQuery(internal.listings.getByJeIdInternal, { jeId });
 
         // Dedup: skip if ai_validated_at and user_message haven't changed
         if (existing) {
@@ -216,7 +216,7 @@ http.route({
           });
 
           // Now fetch the created listing to patch accuracy data
-          const created = await ctx.runQuery(api.listings.getByJeId, { jeId });
+          const created = await ctx.runQuery(internal.listings.getByJeIdInternal, { jeId });
           if (created) {
             await ctx.runMutation(api.listings.patchAccuracyData, {
               id: (created as any)._id,
