@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import { requireAdmin } from "./authz";
 
 // All 22 moderation lists from Implio, provided by Timur (2026-03-13)
 const ALL_LISTS = [
@@ -2153,6 +2154,7 @@ const ALL_LISTS = [
 export const seedAllLists = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     // Delete all existing lists
     const existing = await ctx.db.query("moderationLists").collect();
     for (const list of existing) {

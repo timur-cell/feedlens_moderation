@@ -17,7 +17,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -671,12 +671,18 @@ function EditListDialog({
   const [editDescription, setEditDescription] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
 
-  const handleOpen = () => {
+  // Prefill metadata when a list is opened for editing. Radix only fires
+  // onOpenChange for user interactions, not when the controlled `open` prop
+  // is set programmatically, so prefilling there leaves the fields empty.
+  // Keyed on the id so reactive item updates don't clobber in-progress edits.
+  const listId = list?._id;
+  useEffect(() => {
     if (list) {
       setEditDisplayName(list.displayName);
       setEditDescription(list.description || "");
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listId]);
 
   const handleSaveMetadata = async () => {
     if (!list) return;
@@ -733,7 +739,6 @@ function EditListDialog({
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
-        else handleOpen();
       }}
     >
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -1042,9 +1047,11 @@ export default function ListsPage() {
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog — pass the live document, not the click-time snapshot:
+          a stale snapshot hides item adds/removes and makes index-based
+          removal target the wrong server-side item. */}
       <EditListDialog
-        list={editList}
+        list={editList ? (lists?.find((l) => l._id === editList._id) ?? null) : null}
         open={!!editList}
         onClose={() => setEditList(null)}
       />

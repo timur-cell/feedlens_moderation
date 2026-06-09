@@ -68,7 +68,7 @@ RULE CONFIG STRUCTURE:
   "groupFilter": ["GroupName"], // optional: office group filter
   "feedSourceFilter": ["Kyero"], // optional: feed source filter
   "listRef": "list_name", // optional: reference to a moderation list (text matching)
-  "fieldsToCheck": ["title", "description"], // optional: which fields to check against list
+  "fields": ["title", "description"], // optional: which fields to check against lists/patterns
   "patterns": ["regex1", "regex2"] // optional: regex patterns (for auto_ai category)
 }
 
@@ -127,7 +127,7 @@ Generate a complete rule. Respond with ONLY valid JSON (no markdown, no backtick
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "";
+    const text = data.content?.find((b: any) => b.type === "text")?.text || "";
 
     try {
       const suggestion = JSON.parse(text.trim());

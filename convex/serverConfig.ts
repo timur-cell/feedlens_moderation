@@ -17,7 +17,9 @@ export const config = {
 };
 
 // Default password applied to admin-created accounts when none is supplied.
-// Prefer overriding via the DEFAULT_USER_PASSWORD env var so the value is not
-// shipped in source / the client bundle.
-export const DEFAULT_USER_PASSWORD =
-  process.env.DEFAULT_USER_PASSWORD || "je_feedlens2026_1";
+// Must come from the DEFAULT_USER_PASSWORD env var so the value is never
+// shipped in source / the client bundle. Lazy so unrelated functions in
+// importing modules keep working when the var is unset.
+export function getDefaultUserPassword(): string {
+  return getEnv("DEFAULT_USER_PASSWORD");
+}

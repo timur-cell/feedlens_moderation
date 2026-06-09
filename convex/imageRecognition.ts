@@ -31,6 +31,7 @@ export const saveResult = mutation({
 export const listResults = query({
   args: {},
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const results = await ctx.db
       .query("imageRecognitionResults")
       .order("desc")
@@ -97,6 +98,7 @@ export const saveListingAnalysis = mutation({
 export const listListingAnalyses = query({
   args: {},
   handler: async (ctx) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("listingImageAnalyses")
       .order("desc")
@@ -130,6 +132,7 @@ export const clearAllListingAnalyses = mutation({
 export const getListingAnalysis = query({
   args: { id: v.id("listingImageAnalyses") },
   handler: async (ctx, args) => {
+    await requireModerator(ctx);
     return await ctx.db.get(args.id);
   },
 });

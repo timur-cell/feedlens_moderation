@@ -4,10 +4,11 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 
-// Test user credentials — injected at build time via env vars
+// Test user credentials — injected at build time via env vars. No fallback
+// values: if the vars aren't set for the build, the section doesn't render.
 const TEST_USER = {
-  email: import.meta.env.VITE_TEST_USER_EMAIL || "agent@test.local",
-  password: import.meta.env.VITE_TEST_USER_PASSWORD || "change-me-in-env",
+  email: import.meta.env.VITE_TEST_USER_EMAIL,
+  password: import.meta.env.VITE_TEST_USER_PASSWORD,
   name: "Test Agent",
 } as const;
 
@@ -18,7 +19,7 @@ export function TestUserLoginSection() {
 
   const isPreview = import.meta.env.VITE_IS_PREVIEW === "true";
 
-  if (!isPreview) {
+  if (!isPreview || !TEST_USER.email || !TEST_USER.password) {
     return null;
   }
 

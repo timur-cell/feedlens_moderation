@@ -710,7 +710,7 @@ export default function RulesPage() {
     toggleEnabled({
       id: rule._id,
       modifiedBy: currentUser?.email || currentUser?.name || "unknown",
-    });
+    }).catch(() => toast.error(`Failed to toggle rule "${rule.displayName}"`));
   };
 
   const handleDelete = async () => {

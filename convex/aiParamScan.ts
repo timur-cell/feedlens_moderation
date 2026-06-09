@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { requireModeratorAction } from "./authz";
+import { requireModerator, requireModeratorAction } from "./authz";
+import { toCountryCode } from "./moderation";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -74,7 +75,9 @@ function runDeterministicChecks(params: Record<string, unknown>): ScanFlag[] {
   const bedrooms = params.bedrooms as number | undefined;
   const bathrooms = params.bathrooms as number | undefined;
   const realEstateType = ((params.realEstateType as string) || "").toLowerCase();
-  const country = ((params.country as string) || "").toUpperCase();
+  // Normalize to an ISO code — listings usually carry full names ("Spain",
+  // "United Arab Emirates"), which would never match the code set below.
+  const country = toCountryCode((params.country as string) || "");
 
   // High-cost countries where pricePerSqm thresholds should be stricter
   const HIGH_COST_COUNTRIES = new Set([
@@ -545,11 +548,15 @@ If everything looks fine, return:
         ? `Found ${mergedFlags.length} issue(s) [${parts.join(", ")}]. ${aiResult.summary}`.trim()
         : aiResult.summary || "Parameters look consistent — no issues found.";
 
-    // Confidence: lower when flags exist
+    // Confidence: lower when flags exist. Coerce — a non-numeric model value
+    // (e.g. "high") would otherwise make Math.min produce NaN and persist it.
+    const aiConfidence = Number(aiResult.confidence);
     const finalConfidence =
       mergedFlags.length > 0
-        ? Math.min(aiResult.confidence || 0.5, 0.3)
-        : aiResult.confidence || 0.95;
+        ? Math.min(isFinite(aiConfidence) && aiConfidence > 0 ? aiConfidence : 0.5, 0.3)
+        : isFinite(aiConfidence) && aiConfidence > 0
+          ? aiConfidence
+          : 0.95;
 
     // Save to database (upserts — deletes old scan if exists)
     const scanId = await ctx.runMutation(internal.aiParamScan.saveScan, {
@@ -608,6 +615,7 @@ export const getScanByJeId = query({
   args: { jeId: v.string() },
   returns: v.any(),
   handler: async (ctx, { jeId }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("aiParameterScans")
       .withIndex("by_jeId", (q) => q.eq("jeId", jeId))
@@ -661,6 +669,7 @@ export const getRecentScans = query({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("aiParameterScans")
       .withIndex("by_scannedAt")
@@ -673,6 +682,7 @@ export const getScansByVerdict = query({
   args: { verdict: v.string(), limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { verdict, limit }) => {
+    await requireModerator(ctx);
     return await ctx.db
       .query("aiParameterScans")
       .withIndex("by_verdict", (q) => q.eq("verdict", verdict))
@@ -685,6 +695,7 @@ export const getFlaggedScans = query({
   args: { limit: v.optional(v.number()) },
   returns: v.any(),
   handler: async (ctx, { limit }) => {
+    await requireModerator(ctx);
     // Get all scans with at least 1 flag
     const all = await ctx.db
       .query("aiParameterScans")
@@ -762,6 +773,7 @@ export const getStats = query({
   args: {},
   returns: v.any(),
   handler: async (ctx) => {
+    await requireModerator(ctx);
     const all = await ctx.db.query("aiParameterScans").collect();
     return {
       total: all.length,

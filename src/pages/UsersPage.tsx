@@ -57,7 +57,9 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
-const DEFAULT_PASSWORD = "je_feedlens2026_1";
+// Generate a fresh random password per dialog rather than shipping a fixed
+// default credential in the client bundle.
+const generatePassword = () => `fl-${crypto.randomUUID().replace(/-/g, "").slice(0, 14)}`;
 
 const roleConfig: Record<string, { label: string; icon: any; color: string; badgeClass: string }> = {
   admin: {
@@ -92,7 +94,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("moderator");
-  const [password, setPassword] = useState(DEFAULT_PASSWORD);
+  const [password, setPassword] = useState(generatePassword);
   const [created, setCreated] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -137,7 +139,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
     setName("");
     setEmail("");
     setRole("moderator");
-    setPassword(DEFAULT_PASSWORD);
+    setPassword(generatePassword());
     setCreated(false);
     setCopied(false);
     onClose();
@@ -217,7 +219,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 className="mt-1 font-mono"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Default: <code className="bg-muted px-1 rounded">{DEFAULT_PASSWORD}</code>
+                Randomly generated — edit to choose your own.
               </p>
             </div>
           </div>
@@ -285,7 +287,7 @@ function SetPasswordDialog({
   user: { name: string; email: string } | null;
 }) {
   const setUserPassword = useAction(api.adminUsers.setUserPassword);
-  const [password, setPassword] = useState(DEFAULT_PASSWORD);
+  const [password, setPassword] = useState(generatePassword);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -322,7 +324,7 @@ function SetPasswordDialog({
   };
 
   const handleClose = () => {
-    setPassword(DEFAULT_PASSWORD);
+    setPassword(generatePassword());
     setDone(false);
     setCopied(false);
     onClose();
@@ -357,7 +359,7 @@ function SetPasswordDialog({
                 className="mt-1 font-mono"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Default: <code className="bg-muted px-1 rounded">{DEFAULT_PASSWORD}</code>
+                Randomly generated — edit to choose your own.
               </p>
             </div>
           </div>

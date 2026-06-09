@@ -189,6 +189,16 @@ function ResultCard({ result }: { result: ModerationResult }) {
   // The effective outcome (override takes priority)
   const effectiveOutcome = overrideOutcome || result.outcome;
 
+  // Reset dialog inputs on close — otherwise a canceled Reject leaves the
+  // refusal text in `message`, and a subsequent Approve would send it to the
+  // seller as sellerMessage.
+  const closeActionDialog = () => {
+    setActionDialog(null);
+    setMessage("");
+    setReason("");
+    setRefuseReasonType("other");
+  };
+
   const handleAction = async (action: "approved" | "rejected" | "notice") => {
     if (!dbResult?._id) {
       toast.error("Moderation result not found — cannot override");
@@ -200,16 +210,13 @@ function ResultCard({ result }: { result: ModerationResult }) {
         resultId: dbResult._id,
         newOutcome: action,
         reason: reason || undefined,
-        sellerMessage: message || undefined,
+        sellerMessage: action === "approved" ? undefined : message || undefined,
         overriddenBy: "manual",
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
       });
       setOverrideOutcome(action);
       toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"} — synced to Implio`);
-      setActionDialog(null);
-      setMessage("");
-      setReason("");
-      setRefuseReasonType("other");
+      closeActionDialog();
     } catch (err) {
       console.error("Override failed:", err);
       toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
@@ -447,7 +454,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
       </div>
 
       {/* ─── Reject / Notice Dialog ───────────────────────────────── */}
-      <Dialog open={!!actionDialog} onOpenChange={() => setActionDialog(null)}>
+      <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) closeActionDialog(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -536,7 +543,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActionDialog(null)}>
+            <Button variant="outline" onClick={closeActionDialog}>
               Cancel
             </Button>
             <Button

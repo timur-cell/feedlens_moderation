@@ -521,7 +521,7 @@ function RecentActivity() {
                       {previewListing.lqi != null && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">LQI</span>
-                          <span>{(previewListing.lqi * 100).toFixed(0)}%</span>
+                          <span>{previewListing.lqi.toFixed(0)}%</span>
                         </div>
                       )}
                       {previewListing.imageCount != null && (

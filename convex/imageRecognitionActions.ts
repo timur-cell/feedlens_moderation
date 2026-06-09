@@ -107,6 +107,11 @@ const EMPTY_RESULT: VisionResult = {
 };
 
 // ─── Image fetching (for Claude which requires base64) ──────────
+
+// Claude's vision API rejects anything else (e.g. image/bmp) with a 400,
+// which would fail the whole multi-image request.
+const CLAUDE_SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
 async function fetchImagesAsBase64(urls: string[], maxImages = 5): Promise<Array<{ base64: string; mediaType: string }>> {
   const results: Array<{ base64: string; mediaType: string }> = [];
   for (const url of urls.slice(0, maxImages)) {
@@ -122,6 +127,10 @@ async function fetchImagesAsBase64(urls: string[], maxImages = 5): Promise<Array
       // Detect actual image type from magic bytes (don't trust content-type header —
       // JE CDN often returns image/jpeg for PNG files, causing Claude API 400 errors)
       const mediaType = detectImageType(buffer);
+      if (!CLAUDE_SUPPORTED_MEDIA_TYPES.includes(mediaType)) {
+        console.log(`Skipping unsupported image type ${mediaType}: ${url}`);
+        continue;
+      }
       console.log(`Image loaded: ${(buffer.byteLength / 1024).toFixed(0)}KB, type: ${mediaType}`);
       results.push({ base64, mediaType });
     } catch (e) {
@@ -409,21 +418,30 @@ function averageArrayResults(arr: any[]): any {
     }
   }
 
-  // For text fields, take the worst case
+  // For text fields, take the worst case. Unknown labels rank below every
+  // known one (indexOf would give them -1 — always "worst" — letting a single
+  // unexpected string dominate the aggregate).
+  const rankIn = (order: string[]) => (value: string) => {
+    const i = order.indexOf(value);
+    return i === -1 ? order.length : i;
+  };
+
   const qualityOrder = ["poor", "low", "moderate", "high", "professional", "visualization"];
+  const qualityRank = rankIn(qualityOrder);
   const qualities = arr.map(r => r.image_quality?.toLowerCase()).filter(Boolean);
   if (qualities.length > 0) {
     result.image_quality = qualities.reduce((worst: string, q: string) =>
-      qualityOrder.indexOf(q) < qualityOrder.indexOf(worst) ? q : worst
+      qualityRank(q) < qualityRank(worst) ? q : worst
     , qualities[0]);
   }
 
   // For image_type, take the most cautious (AI-generated > Render > Real photo)
   const typeOrder = ["AI-generated", "Render (3D / CGI)", "Real photo"];
+  const typeRank = rankIn(typeOrder);
   const types = arr.map(r => r.image_type).filter(Boolean);
   if (types.length > 0) {
     result.image_type = types.reduce((worst: string, t: string) =>
-      typeOrder.indexOf(t) < typeOrder.indexOf(worst) ? t : worst
+      typeRank(t) < typeRank(worst) ? t : worst
     , types[0]);
   }
 
@@ -559,6 +577,10 @@ function parsePrice(priceStr: string): { price: number; currency: string } | nul
     } else {
       numStr = numStr.replace(/,/g, '');
     }
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(numStr)) {
+    // European thousands separators only: 1.200.000 → 1200000.
+    // Without this, parseFloat("1.200.000") yields 1.2.
+    numStr = numStr.replace(/\./g, '');
   } else {
     numStr = numStr.replace(/[,\s]/g, '');
   }
@@ -708,7 +730,9 @@ export const analyzeListingByUrl = action({
   },
   handler: async (ctx, args) => {
     await requireModeratorAction(ctx);
-    const maxImages = args.maxImages || 10;
+    // Clamp so a large request can't drive unbounded Claude batches past the
+    // action time limit.
+    const maxImages = Math.min(args.maxImages || 10, 30);
 
     // 1. Extract JE ID from input
     const trimmed = args.input.trim();
