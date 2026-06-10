@@ -15,9 +15,7 @@ import {
   LandingPage,
   LoginPage,
   SettingsPage,
-  UsersPage,
   ListsPage,
-  LabPage,
 } from "./pages";
 import ImageRecognitionPage from "./pages/ImageRecognitionPage";
 import ModerateByIdPage from "./pages/ModerateByIdPage";

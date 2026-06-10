@@ -4,7 +4,6 @@ import { apiClient } from "@/lib/apiClient";
 import {
   FlaskConical,
   AlertTriangle,
-  CheckCircle2,
   TrendingUp,
   Loader2,
   ChevronRight,

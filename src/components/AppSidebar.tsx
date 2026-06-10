@@ -4,7 +4,6 @@ import {
   Moon,
   Settings,
   Sun,
-  ListChecks,
   ClipboardList,
   ShieldCheck,
   MessageSquare,
@@ -13,7 +12,6 @@ import {
   Sparkles,
   ListIcon,
   SearchCheck,
-  FlaskConical,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";

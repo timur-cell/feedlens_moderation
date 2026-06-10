@@ -2,7 +2,6 @@ import {
   List,
   Search,
   Plus,
-  Trash2,
   ChevronDown,
   ChevronUp,
   Pencil,
@@ -19,7 +18,7 @@ import {
 import { useEffect, useState, useMemo } from "react";
 import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +76,6 @@ function ListCard({
   list,
   rules,
   onEdit,
-  onDelete,
 }: {
   list: ModerationList;
   rules: any[];

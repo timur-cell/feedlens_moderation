@@ -2,7 +2,6 @@ import { jeImageUrl } from "@/components/JeImage";
 import {
   CheckCircle2,
   XCircle,
-  MessageSquare,
   Clock,
   TrendingUp,
   Loader2,
@@ -10,7 +9,6 @@ import {
   Download,
   Calendar,
   Bot,
-  BarChart3,
   ExternalLink,
   Eye,
   Image as ImageIcon,
@@ -134,225 +132,6 @@ function StatCard({
   if (href) return <Link to={href}>{content}</Link>;
   return content;
 }
-
-// ─── Stacked Bar Chart ──────────────────────────────────────────
-
-const CHART_LAYERS = [
-  { key: "approvedAuto", label: "Approved - Auto", color: "#10b981" },
-  { key: "approvedManual", label: "Approved - Manual", color: "#6ee7b7" },
-  { key: "rejectedAuto", label: "Refused - Auto", color: "#ef4444" },
-  { key: "rejectedManual", label: "Refused - Manual", color: "#fca5a5" },
-  { key: "noticedAuto", label: "Notice - Auto", color: "#0ea5e9" },
-  { key: "noticedManual", label: "Notice - Manual", color: "#7dd3fc" },
-  { key: "manualQueue", label: "Manual Queue", color: "#f59e0b" },
-] as const;
-
-function StackedBarChart({ data }: { data: Array<Record<string, any>> }) {
-  const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
-  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
-
-  const toggleLayer = (key: string) => {
-    setHiddenLayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  // Calculate max value for scaling (add 10% headroom)
-  const maxValue = useMemo(() => {
-    let max = 0;
-    for (const day of data) {
-      let sum = 0;
-      for (const layer of CHART_LAYERS) {
-        if (!hiddenLayers.has(layer.key)) {
-          sum += (day[layer.key] || 0);
-        }
-      }
-      if (sum > max) max = sum;
-    }
-    return Math.ceil((max || 1) * 1.1); // 10% headroom
-  }, [data, hiddenLayers]);
-
-  // Y-axis ticks — nice round numbers
-  const yTicks = useMemo(() => {
-    const step = maxValue <= 10 ? 2 : maxValue <= 50 ? 10 : maxValue <= 200 ? 25 : Math.ceil(maxValue / 5 / 10) * 10;
-    const ticks: number[] = [];
-    for (let i = 0; i <= maxValue; i += step) ticks.push(i);
-    if (ticks[ticks.length - 1] < maxValue) ticks.push(maxValue);
-    return ticks.reverse();
-  }, [maxValue]);
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="size-4" />
-            Daily Volume
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center py-8 text-muted-foreground">
-          <BarChart3 className="size-8 mx-auto mb-2 opacity-50" />
-          <p>No data to display yet.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Constrain bar width: min 24px, max 80px per bar
-  const barMaxWidth = Math.min(80, Math.max(24, Math.floor(700 / data.length)));
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="size-4" />
-            Daily Volume
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex gap-6">
-          {/* Chart area */}
-          <div className="flex-1 min-w-0">
-            <div className="flex gap-2">
-              {/* Y-axis */}
-              <div className="flex flex-col justify-between text-xs text-muted-foreground w-8 text-right shrink-0 pb-6">
-                {yTicks.map((tick, i) => (
-                  <span key={i}>{tick}</span>
-                ))}
-              </div>
-              {/* Bars area */}
-              <div className="flex-1 relative h-[260px]">
-                {/* Grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none" style={{ bottom: "24px" }}>
-                  {yTicks.map((_, i) => (
-                    <div key={i} className="border-t border-dashed border-muted" />
-                  ))}
-                </div>
-                {/* Bar columns — centered, evenly spaced */}
-                <div className="absolute inset-0 flex items-end justify-center gap-2 pb-6">
-                  {data.map((day, idx) => {
-                    const visibleLayers = CHART_LAYERS.filter(
-                      (l) => !hiddenLayers.has(l.key) && (day[l.key] || 0) > 0
-                    );
-                    const total = visibleLayers.reduce(
-                      (sum, l) => sum + (day[l.key] || 0),
-                      0
-                    );
-                    const barHeight = maxValue > 0 ? (total / maxValue) * 100 : 0;
-
-                    return (
-                      <div
-                        key={day.date}
-                        className="flex flex-col items-center relative z-10"
-                        style={{ width: `${barMaxWidth}px` }}
-                        onMouseEnter={() => setHoveredBar(idx)}
-                        onMouseLeave={() => setHoveredBar(null)}
-                      >
-                        {/* The bar column */}
-                        <div className="w-full flex-1 flex flex-col justify-end relative" style={{ height: "calc(100% - 24px)" }}>
-                          {/* Hover count label */}
-                          {hoveredBar === idx && total > 0 && (
-                            <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold bg-background px-1.5 py-0.5 rounded shadow-sm border z-20 whitespace-nowrap">
-                              {total}
-                            </div>
-                          )}
-                          {/* Stacked segments */}
-                          <div
-                            className="w-full rounded-t-md overflow-hidden flex flex-col-reverse transition-all duration-300"
-                            style={{
-                              height: `${barHeight}%`,
-                              minHeight: total > 0 ? 4 : 0,
-                            }}
-                          >
-                            {visibleLayers.map((layer) => {
-                              const val = day[layer.key] || 0;
-                              const layerPercent = total > 0 ? (val / total) * 100 : 0;
-                              return (
-                                <div
-                                  key={layer.key}
-                                  className="w-full transition-all duration-300"
-                                  style={{
-                                    height: `${layerPercent}%`,
-                                    backgroundColor: layer.color,
-                                    minHeight: val > 0 ? 3 : 0,
-                                  }}
-                                  title={`${layer.label}: ${val}`}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-                        {/* Date label */}
-                        <span className="text-[10px] text-muted-foreground mt-1.5 whitespace-nowrap">
-                          {formatDate(day.date)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="shrink-0 w-[160px] space-y-1.5 pt-2">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-2">
-              Click to toggle
-            </p>
-            {CHART_LAYERS.map((layer) => {
-              const isHidden = hiddenLayers.has(layer.key);
-              return (
-                <button
-                  key={layer.key}
-                  type="button"
-                  className={`flex items-center gap-2 text-xs w-full text-left py-0.5 px-1 rounded transition-colors hover:bg-muted/50 ${
-                    isHidden ? "opacity-40" : ""
-                  }`}
-                  onClick={() => toggleLayer(layer.key)}
-                >
-                  <div
-                    className="size-3 rounded-sm shrink-0 border"
-                    style={{
-                      backgroundColor: isHidden ? "transparent" : layer.color,
-                      borderColor: layer.color,
-                    }}
-                  />
-                  <span className="truncate">{layer.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Hover tooltip for bar details */}
-        {hoveredBar !== null && data[hoveredBar] && (
-          <div className="mt-3 p-2.5 bg-muted/50 rounded-lg text-xs grid grid-cols-4 gap-x-4 gap-y-1.5">
-            <div className="font-medium col-span-4 mb-1 text-sm">{formatDate(data[hoveredBar].date)}</div>
-            {CHART_LAYERS.filter((l) => !hiddenLayers.has(l.key)).map((layer) => (
-              <div key={layer.key} className="flex items-center gap-1.5">
-                <div className="size-2.5 rounded-sm" style={{ backgroundColor: layer.color }} />
-                <span className="text-muted-foreground">{layer.label.split(" - ").pop()}:</span>
-                <span className="font-medium">{data[hoveredBar][layer.key] || 0}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Recent Activity ────────────────────────────────────────────
 
 function RecentActivity() {
   const { data: results } = useApiQuery(apiClient.moderation.recent, {
@@ -738,7 +517,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { stats, dailyData } = dashData;
+  const { stats } = dashData;
   const approvalRate = stats.total > 0 ? ((stats.approved / stats.total) * 100).toFixed(1) : "0";
   const refusalRate = stats.total > 0 ? ((stats.rejected / stats.total) * 100).toFixed(1) : "0";
 

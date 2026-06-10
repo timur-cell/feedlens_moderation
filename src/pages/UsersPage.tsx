@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Eye,
   MoreHorizontal,
-  ChevronDown,
   ChevronUp,
   Activity,
   Clock,

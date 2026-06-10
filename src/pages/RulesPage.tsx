@@ -7,12 +7,9 @@ import {
   Building,
   Loader2,
   Pencil,
-  ChevronDown,
-  ChevronUp,
   TrendingUp,
   AlertTriangle,
   Image,
-  ExternalLink,
   CheckCircle2,
   XCircle,
   MessageSquare,
@@ -74,7 +71,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 // ─── Config maps ─────────────────────────────────────────────────
