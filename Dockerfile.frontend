@@ -4,6 +4,9 @@ ARG BASE_REGISTRY=mirror.gcr.io
 
 FROM ${BASE_REGISTRY}/library/node:22-alpine AS build
 WORKDIR /app
+# Trust extra CA certs (see docker/extra-ca-certs/README.md)
+COPY docker/extra-ca-certs/*.crt /tmp/extra-ca/
+RUN cat /tmp/extra-ca/*.crt >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true
 COPY package.json package-lock.json ./
 RUN npm install --no-audit --no-fund
 COPY tsconfig*.json vite.config.mjs index.html components.json ./

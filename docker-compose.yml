@@ -23,7 +23,8 @@ services:
 
   web:
     build:
-      context: ./rails
+      context: .
+      dockerfile: rails/Dockerfile
       args:
         BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
     environment: &rails_env
@@ -58,7 +59,8 @@ services:
 
   jobs:
     build:
-      context: ./rails
+      context: .
+      dockerfile: rails/Dockerfile
       args:
         BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
     command: ["./bin/jobs"]
