@@ -73,3 +73,18 @@ original TypeScript implementation — see `../scripts/golden/README.md` to rege
 
 See `HANDOFF.md` at the repo root: `bin/rails convex:import[path/to/export.zip]` ingests a
 `npx convex export` ZIP.
+
+## End-to-end (Playwright)
+
+With the compose stack up (use the e2e overlay where jamesedition.com is unreachable):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build -d
+npx playwright install chromium     # once
+bun scripts/e2e/rails_e2e.ts http://localhost:8080
+```
+
+The script logs in as the seeded admin, exercises every page, runs a rules CRUD
+round-trip and a full moderate-by-id flow (against the mock JE API from
+`docker-compose.e2e.yml`). If Playwright's browser CDN is blocked, point
+`E2E_CHROMIUM_PATH` at any installed Chromium binary.
