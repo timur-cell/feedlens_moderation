@@ -21,7 +21,7 @@ WORKDIR /rails
 COPY docker/extra-ca-certs/*.crt /tmp/extra-ca/
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
-      ca-certificates curl libjemalloc2 libpq5 libyaml-0-2 postgresql-client tzdata       ca-certificates curl libjemalloc2 libpq5 libyaml-0-2 postgresql-client && \      ca-certificates curl libjemalloc2 libpq5 libyaml-0-2 postgresql-client && \ \
+      ca-certificates curl libjemalloc2 libpq5 libyaml-0-2 postgresql-client tzdata && \
     (cp /tmp/extra-ca/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true) && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
