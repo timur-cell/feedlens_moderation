@@ -34,34 +34,34 @@ end
 class ConvexImporter
   # Convex table name => model. Order matters: parents before FK dependents.
   TABLES = {
-    "moderators" => Moderator,
-    "listings" => Listing,
-    "moderationResults" => ModerationResult,
-    "rules" => Rule,
-    "moderationLists" => ModerationList,
-    "messageTemplates" => MessageTemplate,
-    "moderatorActivity" => ModeratorActivity,
-    "imageRecognitionResults" => ImageRecognitionResult,
-    "listingImageAnalyses" => ListingImageAnalysis,
-    "moderationNotes" => ModerationNote,
-    "aiParameterScans" => AiParameterScan,
-    "remediationResults" => RemediationResult,
-    "dailyStats" => DailyStat,
-    "settings" => Setting
+    "moderators" => "Moderator",
+    "listings" => "Listing",
+    "moderationResults" => "ModerationResult",
+    "rules" => "Rule",
+    "moderationLists" => "ModerationList",
+    "messageTemplates" => "MessageTemplate",
+    "moderatorActivity" => "ModeratorActivity",
+    "imageRecognitionResults" => "ImageRecognitionResult",
+    "listingImageAnalyses" => "ListingImageAnalysis",
+    "moderationNotes" => "ModerationNote",
+    "aiParameterScans" => "AiParameterScan",
+    "remediationResults" => "RemediationResult",
+    "dailyStats" => "DailyStat",
+    "settings" => "Setting"
   }.freeze
 
   # Convex field => column when straight underscoring is not enough.
   RENAMES = {
-    Rule => { "createdAt" => "created_at_ms", "lastModifiedAt" => "last_modified_at" },
-    Moderator => { "createdAt" => "created_at_ms" },
-    ModerationNote => { "createdAt" => "created_at_ms" },
-    ModerationList => { "updatedAt" => "updated_at_ms" },
-    Setting => { "updatedAt" => "updated_at_ms" }
+    "Rule" => { "createdAt" => "created_at_ms", "lastModifiedAt" => "last_modified_at" },
+    "Moderator" => { "createdAt" => "created_at_ms" },
+    "ModerationNote" => { "createdAt" => "created_at_ms" },
+    "ModerationList" => { "updatedAt" => "updated_at_ms" },
+    "Setting" => { "updatedAt" => "updated_at_ms" }
   }.freeze
 
   UNIQUE_KEYS = {
-    Listing => :je_id, Rule => :name, ModerationList => :name,
-    MessageTemplate => :name, Moderator => :email, DailyStat => :date, Setting => :key
+    "Listing" => :je_id, "Rule" => :name, "ModerationList" => :name,
+    "MessageTemplate" => :name, "Moderator" => :email, "DailyStat" => :date, "Setting" => :key
   }.freeze
 
   def initialize(dir)
@@ -70,7 +70,8 @@ class ConvexImporter
   end
 
   def run
-    TABLES.each do |convex_table, model|
+    TABLES.each do |convex_table, model_name|
+      model = model_name.constantize
       file = documents_file(convex_table)
       unless file
         puts "skip   #{convex_table}: no documents.jsonl found"
@@ -107,18 +108,18 @@ class ConvexImporter
 
   def build_record(model, doc)
     attrs = transform(model, doc)
-    key = UNIQUE_KEYS[model]
+    key = UNIQUE_KEYS[model.name]
     record = key && attrs[key.to_s].present? ? model.find_or_initialize_by(key => attrs[key.to_s]) : model.new
     attrs.each { |k, v| record[k] = v }
     record.created_at ||= Time.zone.at(doc["_creationTime"].to_f / 1000.0) if doc["_creationTime"]
-    if model == Moderator && record.new_record? && record.encrypted_password.blank?
+    if model.name == "Moderator" && record.new_record? && record.encrypted_password.blank?
       record.password = SecureRandom.base58(24) # Scrypt hashes are not portable; reset via admin/mailer
     end
     record
   end
 
   def transform(model, doc)
-    renames = RENAMES[model] || {}
+    renames = RENAMES[model.name] || {}
     cols = model.column_names
     out = {}
     doc.each do |k, v|
