@@ -1,0 +1,52 @@
+[
+ {
+  "name": "generic_reject",
+  "displayName": "Generic Rejection",
+  "category": "reject",
+  "body": "Your listing does not meet JamesEdition's quality standards at this time. Please review our listing guidelines and resubmit.",
+  "isDefault": true
+ },
+ {
+  "name": "condition_reject",
+  "displayName": "Poor Condition Rejection",
+  "category": "reject",
+  "body": "Your listing appears to describe a property that requires significant renovation. JamesEdition showcases luxury properties in good to excellent condition."
+ },
+ {
+  "name": "price_reject",
+  "displayName": "Price Below Minimum",
+  "category": "reject",
+  "body": "Your listing price is below the minimum threshold for JamesEdition. Our platform features luxury properties starting at $490,000 USD."
+ },
+ {
+  "name": "sold_reject",
+  "displayName": "Sold Property",
+  "category": "reject",
+  "body": "Your listing appears to be sold or under offer. Please remove sold properties from your feed to maintain accurate listings."
+ },
+ {
+  "name": "commercial_reject",
+  "displayName": "Commercial Property",
+  "category": "reject",
+  "body": "JamesEdition is a luxury residential marketplace. Commercial and industrial properties are not accepted."
+ },
+ {
+  "name": "generic_notice",
+  "displayName": "Generic Notice",
+  "category": "notice",
+  "body": "We noticed some areas where your listing could be improved. Please review and update accordingly.",
+  "isDefault": true
+ },
+ {
+  "name": "photos_notice",
+  "displayName": "Improve Photos",
+  "category": "notice",
+  "body": "Your listing would benefit from higher quality photos. Professional photography significantly increases buyer interest."
+ },
+ {
+  "name": "description_notice",
+  "displayName": "Improve Description",
+  "category": "notice",
+  "body": "Consider adding a more detailed property description to improve visibility and attract qualified buyers."
+ }
+]

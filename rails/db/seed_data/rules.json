@@ -1,0 +1,2080 @@
+[
+ {
+  "name": "low_image_resolution",
+  "listingCategory": "real_estate",
+  "displayName": "Low Image Resolution (<400×300)",
+  "description": "Average image dimensions below 500×400. RE + Cars.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 10,
+  "config": {
+   "conditions": [
+    {
+     "field": "avgImageWidth",
+     "operator": "<",
+     "value": 500
+    },
+    {
+     "field": "avgImageHeight",
+     "operator": "<",
+     "value": 400
+    }
+   ],
+   "requireAll": true,
+   "categoryFilter": [
+    "real_estate",
+    "cars"
+   ]
+  },
+  "sellerMessage": "Your listing images are below our minimum resolution of 500×400 pixels. Please upload higher-resolution photos and resubmit."
+ },
+ {
+  "name": "low_lqi",
+  "listingCategory": "real_estate",
+  "displayName": "Low LQI – Quality Index Check",
+  "description": "Listing Quality Index below 0.30 (excluding land/plots). Auto-reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 11,
+  "config": {
+   "conditions": [
+    {
+     "field": "lqi",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "lqi",
+     "operator": "<",
+     "value": 30
+    }
+   ],
+   "requireAll": true,
+   "excludeTypes": [
+    "plot",
+    "land",
+    "Private Island",
+    "Farm ranch"
+   ]
+  },
+  "sellerMessage": "Your listing does not meet JamesEdition's quality standards. Please improve your photos, add a detailed description, and ensure all property information is complete."
+ },
+ {
+  "name": "few_pictures",
+  "listingCategory": "real_estate",
+  "displayName": "Too Few Pictures (<2)",
+  "description": "Listing has fewer than 2 images. Auto-reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 12,
+  "config": {
+   "conditions": [
+    {
+     "field": "imageCount",
+     "operator": "<",
+     "value": 2
+    }
+   ]
+  },
+  "sellerMessage": "Your listing needs at least 2 images. Please add more photos and resubmit."
+ },
+ {
+  "name": "price_too_low_re",
+  "listingCategory": "real_estate",
+  "displayName": "Price Below Minimum (RE Sale)",
+  "description": "RE sale listing below $490K in EU countries. Auto-reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 13,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": ">",
+     "value": 100
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 490000
+    }
+   ],
+   "requireAll": true,
+   "countryFilter": [
+    "ES",
+    "FR",
+    "GR",
+    "IT",
+    "PT"
+   ]
+  },
+  "sellerMessage": "Your listing price is below the minimum threshold for JamesEdition in this market. Please verify your price or contact support if you believe this is an error."
+ },
+ {
+  "name": "too_low_price_430k",
+  "listingCategory": "real_estate",
+  "displayName": "Very Low Price (<$430K EU)",
+  "description": "RE sale under $430K in ES/FR/GR/IT/PT. AI-verified — auto-decides if ≥90% confident.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "notice",
+  "priority": 14,
+  "enabled": false,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": "<=",
+     "value": 430000
+    },
+    {
+     "field": "priceUsd",
+     "operator": ">",
+     "value": 100
+    }
+   ],
+   "countryFilter": [
+    "ES",
+    "FR",
+    "GR",
+    "IT",
+    "PT"
+   ]
+  },
+  "sellerMessage": "Your listing price appears low for JamesEdition's luxury marketplace. Please verify your pricing."
+ },
+ {
+  "name": "five_hundred_million_ads",
+  "listingCategory": "real_estate",
+  "displayName": "$500M+ Listings",
+  "description": "Any listing priced $500M+ (excluding private islands). Sent to manual moderation queue.",
+  "category": "former_manual",
+  "tier": "manual",
+  "action": "flag",
+  "priority": 15,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": ">=",
+     "value": 500000000
+    }
+   ],
+   "excludeTypes": [
+    "private_island"
+   ]
+  },
+  "sellerMessage": "Listings priced over $500M require manual verification. Our team will review your listing shortly."
+ },
+ {
+  "name": "high_price_low_lqi",
+  "listingCategory": "real_estate",
+  "displayName": "High Price >$50M + Low LQI or Few Images",
+  "description": "Listings over $50M with LQI<45 or ≤4 images. AI-verified — auto-rejects if ≥90% confident.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 16,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": ">",
+     "value": 50000000
+    }
+   ],
+   "orConditions": [
+    {
+     "field": "lqi",
+     "operator": "<",
+     "value": 45
+    },
+    {
+     "field": "imageCount",
+     "operator": "<=",
+     "value": 4
+    }
+   ]
+  },
+  "sellerMessage": "Your listing is priced above $50M but has limited photos or a low quality score. Please add more high-quality images and improve your listing details."
+ },
+ {
+  "name": "incorrectly_priced",
+  "listingCategory": "real_estate",
+  "displayName": "Incorrectly Priced (>$100M, ≤5 beds)",
+  "description": "Price over $100M (non-zero) but only ≤5 bedrooms (not castle/chateau/farm_ranch/land, not US). Likely pricing error.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 17,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": "!=",
+     "value": 0
+    },
+    {
+     "field": "priceUsd",
+     "operator": ">=",
+     "value": 100000000
+    },
+    {
+     "field": "bedrooms",
+     "operator": "<=",
+     "value": 5
+    },
+    {
+     "field": "bedrooms",
+     "operator": ">=",
+     "value": 0
+    }
+   ],
+   "excludeTypes": [
+    "castle",
+    "chateau",
+    "farm_ranch",
+    "land"
+   ],
+   "excludeTitleKeywords": [
+    "castle",
+    "chateau",
+    "Castle",
+    "Chateau",
+    "Palace",
+    "palace",
+    "farm_ranch",
+    "island",
+    "Isla",
+    "land"
+   ],
+   "excludeCountries": [
+    "US"
+   ]
+  },
+  "sellerMessage": "The price is incorrect. Please contact JamesEdition support at support@jamesedition.com"
+ },
+ {
+  "name": "rational_check_price",
+  "listingCategory": "real_estate",
+  "displayName": "Rational Check: Price >$100M",
+  "description": "Price over $100M with ≤5 bathrooms (not castle/chateau/island, not US). Sent to manual moderation.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 18,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": ">",
+     "value": 100000000
+    },
+    {
+     "field": "bathrooms",
+     "operator": "<=",
+     "value": 5
+    },
+    {
+     "field": "bathrooms",
+     "operator": ">=",
+     "value": 1
+    }
+   ],
+   "excludeTypes": [
+    "castle",
+    "chateau",
+    "island"
+   ],
+   "excludeTitleKeywords": [
+    "castle",
+    "chateau",
+    "Castle",
+    "Chateau",
+    "Palace",
+    "palace"
+   ],
+   "excludeCountries": [
+    "US"
+   ]
+  },
+  "sellerMessage": "The price appears to be unrealistically high and does not reflect a genuine listing. Please review before resubmitting."
+ },
+ {
+  "name": "dubai_price_sqm",
+  "listingCategory": "real_estate",
+  "displayName": "Dubai Price/sqm Check",
+  "description": "AE listings with price/sqm ≤$1000. Suspiciously low for Dubai.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 19,
+  "config": {
+   "conditions": [
+    {
+     "field": "pricePerSqm",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "pricePerSqm",
+     "operator": "<=",
+     "value": 1000
+    }
+   ],
+   "countryFilter": [
+    "AE"
+   ],
+   "typeFilter": [
+    "apartment",
+    "villa",
+    "house",
+    "penthouse",
+    "townhouse"
+   ]
+  },
+  "sellerMessage": "The price per square meter for your Dubai listing appears unusually low. Please verify your listing price and living area, then resubmit."
+ },
+ {
+  "name": "extremely_low_price_sqm",
+  "listingCategory": "real_estate",
+  "displayName": "Extremely Low Price/sqm (≤$150)",
+  "description": "Price per sqm ≤$150 for apartments/villas/houses (not US/AE, not rentals).",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 20,
+  "config": {
+   "conditions": [
+    {
+     "field": "pricePerSqm",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "pricePerSqm",
+     "operator": "<=",
+     "value": 150
+    }
+   ],
+   "typeFilter": [
+    "apartment",
+    "villa",
+    "house",
+    "penthouse"
+   ],
+   "excludeCountries": [
+    "US",
+    "AE"
+   ],
+   "nonRentalOnly": true
+  },
+  "sellerMessage": "The price per square meter is unusually low for this property type and market. Please verify your listing price and living area."
+ },
+ {
+  "name": "rational_bedrooms_bathrooms",
+  "listingCategory": "real_estate",
+  "displayName": "Rational Check: Bedrooms/Bathrooms ≥30",
+  "description": "30+ bedrooms or bathrooms (not castle/chateau, price ≤$3M). Likely scraping error.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 21,
+  "config": {
+   "orConditions": [
+    {
+     "field": "bedrooms",
+     "operator": ">=",
+     "value": 30
+    },
+    {
+     "field": "bathrooms",
+     "operator": ">=",
+     "value": 30
+    }
+   ],
+   "maxPrice": 3000000,
+   "excludeTypes": [
+    "castle",
+    "chateau"
+   ],
+   "excludeTitleKeywords": [
+    "castle",
+    "chateau",
+    "Castle",
+    "Chateau",
+    "Palace",
+    "palace"
+   ]
+  },
+  "sellerMessage": "The number of bedrooms/bathrooms appears unrealistically high and does not reflect a genuine listing. Please review before resubmitting."
+ },
+ {
+  "name": "scraping_bedrooms_too_big",
+  "listingCategory": "real_estate",
+  "displayName": "Scraping: Bedrooms/Bathrooms ≥20 (CGG/Yooko)",
+  "description": "20+ beds/baths from CGG/Yooko groups (2837, 2771). Scraping error.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 22,
+  "config": {
+   "orConditions": [
+    {
+     "field": "bedrooms",
+     "operator": ">=",
+     "value": 20
+    },
+    {
+     "field": "bathrooms",
+     "operator": ">=",
+     "value": 20
+    }
+   ],
+   "maxPrice": 10000000,
+   "groupFilter": [
+    "2837",
+    "2771"
+   ],
+   "excludeTypes": [
+    "castle",
+    "chateau",
+    "other"
+   ]
+  },
+  "sellerMessage": "Your listing shows 20+ bedrooms or bathrooms, which appears to be a data error. Please correct the property details and resubmit."
+ },
+ {
+  "name": "living_area_too_large",
+  "listingCategory": "real_estate",
+  "displayName": "Living Area >10,000 sqm",
+  "description": "Living area over 10,000 sqm (not castle/land, price ≤$10M, not US/AE). AI-verified.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 23,
+  "config": {
+   "conditions": [
+    {
+     "field": "livingArea",
+     "operator": ">=",
+     "value": 10000
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<=",
+     "value": 10000000
+    }
+   ],
+   "excludeTypes": [
+    "castle",
+    "chateau",
+    "land",
+    "other",
+    "farm_ranch"
+   ],
+   "excludeCountries": [
+    "US",
+    "AE"
+   ]
+  },
+  "sellerMessage": "Your listing shows a living area over 10,000 sqm, which may be incorrect. Our team will verify this."
+ },
+ {
+  "name": "living_area_too_small",
+  "listingCategory": "real_estate",
+  "displayName": "Living Area Too Small (<10 sqm)",
+  "description": "Living area under 10 sqm (not castle/land, not US/AE). AI-verified.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 24,
+  "config": {
+   "conditions": [
+    {
+     "field": "livingArea",
+     "operator": "<",
+     "value": 10
+    },
+    {
+     "field": "livingArea",
+     "operator": ">",
+     "value": 0
+    }
+   ],
+   "excludeTypes": [
+    "castle",
+    "chateau",
+    "land",
+    "other",
+    "farm_ranch"
+   ],
+   "excludeCountries": [
+    "US",
+    "AE"
+   ]
+  },
+  "sellerMessage": "Your listing shows a living area under 10 sqm, which may be a data error. Our team will verify this."
+ },
+ {
+  "name": "land_equals_living",
+  "listingCategory": "real_estate",
+  "displayName": "Land Area = Living Area",
+  "description": "Land area equals living area (data quality flag). Both must be present and > 0. AI-verified.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 25,
+  "config": {
+   "customCheck": "land_equals_living",
+   "requireBothFields": true
+  },
+  "sellerMessage": "The land area and living area of your property appear to be identical. Please verify these measurements."
+ },
+ {
+  "name": "living_area_exceeds_max",
+  "listingCategory": "real_estate",
+  "displayName": "Living Area Exceeds Max for Type",
+  "description": "Living area unreasonably large for the property type.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 26,
+  "config": {
+   "customCheck": "living_area_exceeds_max"
+  },
+  "sellerMessage": "The living area exceeds the expected maximum for this property type. Please verify your listing details and resubmit."
+ },
+ {
+  "name": "por_price_zero",
+  "listingCategory": "real_estate",
+  "displayName": "POR + Price=0 + Small Unit",
+  "description": "Price on request with $0 price, small living area ≤60sqm, ≤2 beds. Suspicious.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 27,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    },
+    {
+     "field": "price",
+     "operator": "eq",
+     "value": 0
+    },
+    {
+     "field": "livingArea",
+     "operator": "<=",
+     "value": 60
+    },
+    {
+     "field": "livingArea",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "bedrooms",
+     "operator": "<=",
+     "value": 2
+    },
+    {
+     "field": "bedrooms",
+     "operator": ">",
+     "value": 0
+    }
+   ]
+  },
+  "sellerMessage": "Price on Request listings must include complete property details. Your listing has no price and limited information, which does not meet our listing requirements."
+ },
+ {
+  "name": "por_france",
+  "listingCategory": "real_estate",
+  "displayName": "POR Listings France (Illegal)",
+  "description": "Price on Request is not allowed for French real estate listings (legal requirement).",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 28,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "countryFilter": [
+    "FR",
+    "MF"
+   ]
+  },
+  "sellerMessage": "Price on Request listings are not permitted in France due to legal requirements. Please add a price to your listing."
+ },
+ {
+  "name": "por_low_price",
+  "listingCategory": "real_estate",
+  "displayName": "POR + Price <$450K (EU)",
+  "description": "Price on Request with listed price under $450K in key EU countries.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 29,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 450000
+    },
+    {
+     "field": "priceUsd",
+     "operator": ">",
+     "value": 10
+    }
+   ],
+   "countryFilter": [
+    "ES",
+    "FR",
+    "GR",
+    "IT",
+    "PT",
+    "US"
+   ]
+  },
+  "sellerMessage": "Price on Request is not available for listings priced under $450,000 in this market. Please set a visible price or contact support."
+ },
+ {
+  "name": "russia_block",
+  "listingCategory": "real_estate",
+  "displayName": "All Listings in Russia",
+  "description": "Block all listings with country code RU.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 30,
+  "config": {
+   "conditions": [
+    {
+     "field": "country",
+     "operator": "eq",
+     "value": "RU"
+    }
+   ]
+  },
+  "sellerMessage": "Listings located in Russia are not currently accepted on JamesEdition."
+ },
+ {
+  "name": "moderation_by_request",
+  "listingCategory": "real_estate",
+  "displayName": "Manual Review by Request",
+  "description": "Flagged by Viktor for manual review.",
+  "category": "former_manual",
+  "tier": "manual",
+  "action": "flag",
+  "priority": 31,
+  "config": {
+   "conditions": [
+    {
+     "field": "manualReview",
+     "operator": "eq",
+     "value": true
+    },
+    {
+     "field": "viktorFlagged",
+     "operator": "eq",
+     "value": true
+    }
+   ]
+  },
+  "sellerMessage": "Your listing has been flagged for manual review. Our team will review it shortly."
+ },
+ {
+  "name": "short_description",
+  "listingCategory": "real_estate",
+  "displayName": "Short Description",
+  "description": "Description is too short (under 50 characters). AI-verified.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 32,
+  "config": {
+   "conditions": [
+    {
+     "field": "descriptionLength",
+     "operator": "<",
+     "value": 50
+    },
+    {
+     "field": "descriptionLength",
+     "operator": ">",
+     "value": 0
+    }
+   ]
+  },
+  "sellerMessage": "Your listing description is very short. Please add more detail to help buyers understand your property."
+ },
+ {
+  "name": "title_equals_other",
+  "listingCategory": "real_estate",
+  "displayName": "Title = 'Other'",
+  "description": "Title is literally 'Other' with type 'other'. Likely placeholder.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 33,
+  "config": {
+   "conditions": [
+    {
+     "field": "title",
+     "operator": "eq",
+     "value": "Other"
+    },
+    {
+     "field": "realEstateType",
+     "operator": "eq",
+     "value": "other"
+    }
+   ]
+  },
+  "sellerMessage": "Your listing title is a placeholder. Please update it with a descriptive title that reflects the property."
+ },
+ {
+  "name": "commercial_properties_title",
+  "listingCategory": "real_estate",
+  "displayName": "Commercial Properties (Title)",
+  "description": "Title contains commercial keywords from RE_Commercial_properties_2023 list. Type is land/other.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 40,
+  "config": {
+   "listRef": "RE_Commercial_properties_2023",
+   "fields": [
+    "title"
+   ],
+   "excludeListRef": "RE_residential_types_list",
+   "excludeFields": [
+    "title",
+    "description"
+   ]
+  },
+  "sellerMessage": "JamesEdition is a luxury residential marketplace. Commercial properties such as offices, warehouses, and industrial spaces are not accepted."
+ },
+ {
+  "name": "commercial_properties_23",
+  "listingCategory": "real_estate",
+  "displayName": "Commercial Properties 2023 (Title)",
+  "description": "Updated commercial keyword list in title, not residential type. Uses RE_Commercial_properties_2023.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 41,
+  "config": {
+   "listRef": "RE_Commercial_properties_2023",
+   "fields": [
+    "title"
+   ],
+   "excludeListRef": "RE_residential_types_list",
+   "excludeFields": [
+    "title",
+    "description"
+   ]
+  },
+  "sellerMessage": "JamesEdition is a luxury residential marketplace. Commercial properties are not accepted on our platform."
+ },
+ {
+  "name": "commercial_body_other",
+  "listingCategory": "real_estate",
+  "displayName": "Commercial (Body Text, Type=Other)",
+  "description": "Body text contains commercial keywords + complex_of_apt, type is Other/castle, no residential keywords.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 42,
+  "config": {
+   "listRef": "RE_Commercial_properties_2023",
+   "additionalListRef": "complex_of_apt",
+   "fields": [
+    "description"
+   ],
+   "typeFilter": [
+    "other",
+    "Other",
+    "castle"
+   ],
+   "excludeListRef": "RE_residential_types_list"
+  },
+  "sellerMessage": "Your listing description suggests this may be a commercial property. JamesEdition only accepts luxury residential listings. If this is residential, please update your description to clarify."
+ },
+ {
+  "name": "sold_keywords",
+  "listingCategory": "real_estate",
+  "displayName": "Sold Properties (Title Keywords)",
+  "description": "Title contains sold keywords from Sold_Properties list. Excludes Sold_furnished false positives.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 43,
+  "config": {
+   "listRef": "Sold_Properties",
+   "additionalListRef": "Sold_properties_gpt",
+   "fields": [
+    "title"
+   ],
+   "excludeListRef": "Sold_furnished"
+  },
+  "sellerMessage": "Your listing appears to be sold or under offer. Please remove sold properties from your feed to keep your listings current."
+ },
+ {
+  "name": "bad_condition_keywords",
+  "listingCategory": "real_estate",
+  "displayName": "Bad Condition Keywords (Title)",
+  "description": "Title matches RE_bad_condition23 list. Not for castles/land. Excludes RE_fancy_types. Price <$1.5M. AI-verified.",
+  "category": "former_manual",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 44,
+  "config": {
+   "listRef": "RE_bad_condition23",
+   "fields": [
+    "title"
+   ],
+   "excludeListRef": "RE_fancy_types",
+   "excludeFields": [
+    "title",
+    "description"
+   ],
+   "excludeTypes": [
+    "castle",
+    "land",
+    "plot"
+   ],
+   "maxPrice": 1500000
+  },
+  "sellerMessage": "Your listing appears to describe a property requiring significant renovation. JamesEdition showcases luxury properties in good to excellent condition."
+ },
+ {
+  "name": "ai_images_description",
+  "listingCategory": "real_estate",
+  "displayName": "AI-Generated Images (Description)",
+  "description": "Description mentions AI-generated images. Uses AI_images list.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 45,
+  "config": {
+   "listRef": "AI_images",
+   "fields": [
+    "title",
+    "description"
+   ]
+  },
+  "sellerMessage": "Your listing appears to use AI-generated images. JamesEdition requires actual photos of the property."
+ },
+ {
+  "name": "not_real_images_description",
+  "listingCategory": "real_estate",
+  "displayName": "Non-Real Images (Description)",
+  "description": "Description indicates images don't represent the actual property. Uses not_real_images list.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 46,
+  "config": {
+   "listRef": "not_real_images",
+   "fields": [
+    "title",
+    "description"
+   ]
+  },
+  "sellerMessage": "Your listing indicates the images may not represent the actual property. Please upload photos of the real property."
+ },
+ {
+  "name": "new_developments",
+  "listingCategory": "real_estate",
+  "displayName": "New Developments (Title/Description)",
+  "description": "Listing matches new development keywords from RE_New_Developments list.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 47,
+  "config": {
+   "listRef": "RE_New_Developments",
+   "fields": [
+    "title",
+    "description"
+   ]
+  },
+  "sellerMessage": "Your listing appears to be a new development or off-plan project. These listings require additional review."
+ },
+ {
+  "name": "duplicates_within_single_account_us",
+  "listingCategory": "real_estate",
+  "displayName": "Duplicates Within Single Account (US)",
+  "description": "Duplicate listings for the same property within a single US account. Excludes new developments, land/other types, and exception lists.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 35,
+  "config": {
+   "conditions": [
+    {
+     "field": "duplicatesOriginalListing",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "countryFilter": [
+    "US"
+   ],
+   "excludeTypes": [
+    "land",
+    "other"
+   ],
+   "excludeBodyKeywords": [
+    "RE_New_Developments"
+   ],
+   "exceptionLists": [
+    "Duplicate_exceptions_within_1_account",
+    "office_exceptions_duplicate1"
+   ]
+  },
+  "sellerMessage": "Duplicate listings for the same property within a single account are not allowed."
+ },
+ {
+  "name": "duplicates_within_single_account_spain",
+  "listingCategory": "real_estate",
+  "displayName": "Duplicates Within Single Account (Spain)",
+  "description": "Duplicate listings for the same property within a single Spanish account. Excludes new developments, land/other types, office 118806, and exception lists.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 36,
+  "config": {
+   "conditions": [
+    {
+     "field": "duplicatesOriginalListing",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "countryFilter": [
+    "ES"
+   ],
+   "excludeTypes": [
+    "land",
+    "other"
+   ],
+   "excludeBodyKeywords": [
+    "RE_New_Developments"
+   ],
+   "excludeOffices": [
+    118806
+   ],
+   "exceptionLists": [
+    "Duplicate_exceptions_within_1_account",
+    "office_exceptions_duplicate1"
+   ]
+  },
+  "sellerMessage": "Duplicate listings for the same property within a single account are not allowed."
+ },
+ {
+  "name": "duplicates_within_single_account_portugal",
+  "listingCategory": "real_estate",
+  "displayName": "Duplicates Within Single Account (Portugal)",
+  "description": "Duplicate listings for the same property within a single Portuguese account. Excludes new developments, land/other types, office 145919, and exception lists.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 37,
+  "config": {
+   "conditions": [
+    {
+     "field": "duplicatesOriginalListing",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "countryFilter": [
+    "PT"
+   ],
+   "excludeTypes": [
+    "land",
+    "other"
+   ],
+   "excludeBodyKeywords": [
+    "RE_New_Developments"
+   ],
+   "excludeOffices": [
+    145919
+   ],
+   "exceptionLists": [
+    "Duplicate_exceptions_within_1_account",
+    "office_exceptions_duplicate1"
+   ]
+  },
+  "sellerMessage": "Duplicate listings for the same property within a single account are not allowed."
+ },
+ {
+  "name": "cars_low_price",
+  "listingCategory": "cars",
+  "displayName": "Cars: Price <$5,000",
+  "description": "Car listings under $5,000. Too low for luxury marketplace.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 50,
+  "config": {
+   "conditions": [
+    {
+     "field": "price",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "price",
+     "operator": "<",
+     "value": 5000
+    }
+   ],
+   "categoryFilter": [
+    "cars"
+   ]
+  },
+  "sellerMessage": "Car listings under $5,000 are below JamesEdition's minimum threshold for the luxury automotive marketplace."
+ },
+ {
+  "name": "cars_no_year",
+  "listingCategory": "cars",
+  "displayName": "Cars: No Year + Low Price",
+  "description": "Car under $35K, no year, not a luxury brand. Uses luxuryCars list for exclusion.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 51,
+  "config": {
+   "conditions": [
+    {
+     "field": "price",
+     "operator": "<",
+     "value": 35000
+    },
+    {
+     "field": "year",
+     "operator": "is_null",
+     "value": true
+    }
+   ],
+   "categoryFilter": [
+    "cars"
+   ],
+   "excludeTitleListRef": "luxuryCars"
+  },
+  "sellerMessage": "Your car listing is missing the model year and is priced below our threshold. Please add the model year and verify your price."
+ },
+ {
+  "name": "cars_freemium_low_price",
+  "listingCategory": "cars",
+  "displayName": "Cars: Freemium Low Price (Not Luxury)",
+  "description": "Freemium car listing under $80K, year ≥1980, not luxury brand. Uses luxuryCars list for exclusion.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 52,
+  "config": {
+   "conditions": [
+    {
+     "field": "price",
+     "operator": "<",
+     "value": 80000
+    },
+    {
+     "field": "year",
+     "operator": ">=",
+     "value": 1980
+    }
+   ],
+   "categoryFilter": [
+    "cars"
+   ],
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "excludeTitleListRef": "luxuryCars"
+  },
+  "sellerMessage": "Your car listing does not meet JamesEdition's price threshold for this vehicle category. Our marketplace features luxury and premium vehicles."
+ },
+ {
+  "name": "cars_truck_models",
+  "listingCategory": "cars",
+  "displayName": "Cars: Truck Models",
+  "description": "Freemium car listings for trucks/commercial vehicles under $130K.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 53,
+  "config": {
+   "patterns": [
+    "\\b(Ford\\s*F[- ]?150|Ford\\s*F[- ]?250|Chevrolet\\s*Silverado|Ram\\s*1500|Toyota\\s*Tacoma|GMC\\s*Sierra|Nissan\\s*Titan|Ford\\s*Ranger|Toyota\\s*Tundra|Jeep\\s*Gladiator|Dodge\\s*Ram)\\b"
+   ],
+   "fields": [
+    "title"
+   ],
+   "categoryFilter": [
+    "cars"
+   ],
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "maxPrice": 130000
+  },
+  "sellerMessage": "Trucks and commercial vehicles are not accepted on JamesEdition. Our marketplace focuses on luxury passenger vehicles."
+ },
+ {
+  "name": "cars_non_luxury_brand",
+  "listingCategory": "cars",
+  "displayName": "Cars: Non-Luxury Brand Check",
+  "description": "Car title checked against luxuryCars list. Non-matching brands flagged for lower-priced listings.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 57,
+  "config": {
+   "categoryFilter": [
+    "cars"
+   ],
+   "excludeTitleListRef": "luxuryCars",
+   "maxPrice": 200000
+  },
+  "sellerMessage": "Your vehicle may not meet JamesEdition's luxury brand criteria for this price range."
+ },
+ {
+  "name": "netty_rentals",
+  "listingCategory": "real_estate",
+  "displayName": "Netty Rentals Reject",
+  "description": "Group 890 (Netty): Reject all rental listings.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 101,
+  "config": {
+   "groupFilter": [
+    "890"
+   ],
+   "rentalOnly": true
+  },
+  "sellerMessage": "Rental listings are not accepted from this feed on JamesEdition."
+ },
+ {
+  "name": "cgg_2_images",
+  "listingCategory": "real_estate",
+  "displayName": "CGG/Yooko: <3 Images",
+  "description": "Groups 2771/2837 (CGG/Yooko): Under 3 images. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 102,
+  "config": {
+   "groupFilter": [
+    "2771",
+    "2837"
+   ],
+   "conditions": [
+    {
+     "field": "imageCount",
+     "operator": "<",
+     "value": 3
+    }
+   ]
+  },
+  "sellerMessage": "Your listing needs at least 3 images. Please add more photos and resubmit."
+ },
+ {
+  "name": "nymls_images",
+  "listingCategory": "real_estate",
+  "displayName": "NYStateMLS: ≤3 Images",
+  "description": "Group 3167 (NYStateMLS): 3 or fewer images. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 103,
+  "config": {
+   "groupFilter": [
+    "3167"
+   ],
+   "conditions": [
+    {
+     "field": "imageCount",
+     "operator": "<=",
+     "value": 3
+    }
+   ]
+  },
+  "sellerMessage": "Your listing needs more than 3 images to meet our requirements. Please add additional photos."
+ },
+ {
+  "name": "nystatemls_lqi",
+  "listingCategory": "real_estate",
+  "displayName": "NYStateMLS: LQI <45%",
+  "description": "Group 3167 (NYStateMLS): LQI ≤45%. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 104,
+  "config": {
+   "groupFilter": [
+    "3167"
+   ],
+   "conditions": [
+    {
+     "field": "lqi",
+     "operator": ">",
+     "value": 0
+    },
+    {
+     "field": "lqi",
+     "operator": "<=",
+     "value": 45
+    }
+   ]
+  },
+  "sellerMessage": "Your listing does not meet the quality standards required for this MLS feed on JamesEdition."
+ },
+ {
+  "name": "outdated_freemium_under_2m",
+  "listingCategory": "real_estate",
+  "displayName": "Outdated: Freemium <$2M",
+  "description": "Freemium account, outdated listing, price <$2M, created 2023 or earlier. ⚠️ HARDCODED DATES.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 110,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 2000000
+    }
+   ],
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "outdated": true,
+   "createdBeforeYear": 2024,
+   "note": "HARDCODED DATE - needs dynamic check"
+  },
+  "sellerMessage": "This listing appears to be outdated. Please update your listing information or remove stale listings from your feed."
+ },
+ {
+  "name": "outdated_freemium_2m_5m",
+  "listingCategory": "real_estate",
+  "displayName": "Outdated: Freemium $2-5M",
+  "description": "Freemium, outdated, $2-5M, created 2022 or earlier. ⚠️ HARDCODED DATES.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 111,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceUsd",
+     "operator": ">=",
+     "value": 2000000
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 5000000
+    }
+   ],
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "outdated": true,
+   "createdBeforeYear": 2023
+  },
+  "sellerMessage": "This listing appears to be outdated. Please update your listing details or remove it from your feed."
+ },
+ {
+  "name": "outdated_paid_approve",
+  "listingCategory": "real_estate",
+  "displayName": "Outdated: Paid Accounts (Auto-Approve)",
+  "description": "Paid accounts with outdated listings — auto-approve (except office 102696).",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "approve",
+  "priority": 112,
+  "config": {
+   "excludeAccountTypes": [
+    "freemium"
+   ],
+   "outdated": true,
+   "excludeOffices": [
+    102696
+   ]
+  }
+ },
+ {
+  "name": "gpt_condition_auto_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Auto-Reject (Italy)",
+  "description": "IT listings with AI condition score ≤2.4 and conclusion ≤2.4. Price <$2M. Auto-reject.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 70,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<=",
+     "value": 2.4
+    },
+    {
+     "field": "gptConclusion",
+     "operator": "<=",
+     "value": 2.4
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 2000000
+    }
+   ]
+  },
+  "sellerMessage": "This listing does not meet the visual quality standards for the Italian market on JamesEdition."
+ },
+ {
+  "name": "gpt_condition_auto_portugal",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Auto-Reject (Portugal)",
+  "description": "PT listings with AI condition ≤2.0 and conclusion ≤2.5. Price <$1.5M.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 71,
+  "config": {
+   "countryFilter": [
+    "PT"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<=",
+     "value": 2
+    },
+    {
+     "field": "gptConclusion",
+     "operator": "<=",
+     "value": 2.5
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 1500000
+    }
+   ]
+  },
+  "sellerMessage": "This listing does not meet the visual quality standards for the Portuguese market on JamesEdition."
+ },
+ {
+  "name": "gpt_condition_auto_spain",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Auto-Reject (Spain)",
+  "description": "ES listings with AI condition ≤2.0 and conclusion ≤2.0. Price ≤$2.5M.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 72,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<=",
+     "value": 2
+    },
+    {
+     "field": "gptConclusion",
+     "operator": "<=",
+     "value": 2
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<=",
+     "value": 2500000
+    }
+   ]
+  },
+  "sellerMessage": "This listing does not meet the visual quality standards for the Spanish market on JamesEdition."
+ },
+ {
+  "name": "gpt_condition_auto_spain_low",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Auto-Reject (Spain <$600K)",
+  "description": "ES listings under $550K with AI condition ≤3.1 and conclusion ≤3. Stricter threshold.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 73,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<=",
+     "value": 3.1
+    },
+    {
+     "field": "gptConclusion",
+     "operator": "<=",
+     "value": 3
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 550000
+    }
+   ]
+  },
+  "sellerMessage": "This listing does not meet the visual quality standards for the Spanish market on JamesEdition."
+ },
+ {
+  "name": "gpt_condition_manual_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Manual (Italy)",
+  "description": "IT listings with borderline AI condition <2.5. Manual queue for human review.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 80,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<",
+     "value": 2.5
+    }
+   ]
+  }
+ },
+ {
+  "name": "gpt_condition_manual_spain",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Condition Manual (Spain)",
+  "description": "ES listings $500K-$2.1M with borderline AI scores. Manual queue.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 81,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptCondition",
+     "operator": "<",
+     "value": 3
+    },
+    {
+     "field": "priceUsd",
+     "operator": ">=",
+     "value": 500000
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<=",
+     "value": 2100000
+    }
+   ]
+  }
+ },
+ {
+  "name": "gpt_conclusion_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Conclusion Check (Italy)",
+  "description": "IT listings flagged by AI conclusion score.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 82,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptConclusion",
+     "operator": "<",
+     "value": 2.5
+    }
+   ]
+  }
+ },
+ {
+  "name": "gpt_conclusion_spain",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Conclusion Check (Spain)",
+  "description": "ES listings flagged by AI conclusion score.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 83,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptConclusion",
+     "operator": "<",
+     "value": 2.5
+    }
+   ]
+  }
+ },
+ {
+  "name": "gpt_watermark_sold_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Sold Watermark (Italy)",
+  "description": "IT listings where AI detects SOLD/Venduto watermark on images. Uses Sold_properties_gpt list.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 85,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptWatermarkSold",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "listRef": "Sold_properties_gpt"
+  },
+  "sellerMessage": "This listing appears to be sold. Please remove sold listings from your feed."
+ },
+ {
+  "name": "gpt_watermark_sold_spain",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Sold Watermark (Spain)",
+  "description": "ES listings where AI detects SOLD/Vendido watermark. Uses Sold_properties_gpt list.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 86,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptWatermarkSold",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "listRef": "Sold_properties_gpt"
+  },
+  "sellerMessage": "This listing appears to be sold. Please remove sold listings from your feed."
+ },
+ {
+  "name": "gpt_watermark_sold_portugal",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Sold Watermark (Portugal)",
+  "description": "PT listings where AI detects SOLD watermark. Auto-reject.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 87,
+  "config": {
+   "countryFilter": [
+    "PT"
+   ],
+   "conditions": [
+    {
+     "field": "gptWatermarkSold",
+     "operator": "eq",
+     "value": true
+    }
+   ]
+  },
+  "sellerMessage": "This listing appears to be sold. Please remove sold listings from your feed."
+ },
+ {
+  "name": "gpt_watermark_large_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Large Watermark (Italy)",
+  "description": "IT listings with large watermarks detected by AI. Manual review.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 88,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptWatermarkLarge",
+     "operator": "eq",
+     "value": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "gpt_unidentifiable_italy",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Unidentifiable Property (Italy)",
+  "description": "IT listings where AI cannot identify the property. Price <$6M. Auto-reject.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 90,
+  "config": {
+   "countryFilter": [
+    "IT"
+   ],
+   "conditions": [
+    {
+     "field": "gptImageType",
+     "operator": "eq",
+     "value": "unidentifiable"
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 6000000
+    }
+   ]
+  },
+  "sellerMessage": "Your listing images do not clearly show the property. Please upload clear photos of the actual property."
+ },
+ {
+  "name": "gpt_unidentifiable_spain",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Unidentifiable Property (Spain)",
+  "description": "ES listings where AI cannot identify the property. Price <$1.5M. Auto-reject.",
+  "category": "auto_ai",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 91,
+  "config": {
+   "countryFilter": [
+    "ES"
+   ],
+   "conditions": [
+    {
+     "field": "gptImageType",
+     "operator": "eq",
+     "value": "unidentifiable"
+    },
+    {
+     "field": "priceUsd",
+     "operator": "<",
+     "value": 1500000
+    }
+   ]
+  },
+  "sellerMessage": "Your listing images do not clearly show the property. Please upload clear photos of the actual property."
+ },
+ {
+  "name": "gpt_unidentifiable_manual",
+  "listingCategory": "real_estate",
+  "displayName": "AI: Unidentifiable Property (Manual, ≥$2M)",
+  "description": "High-value listings (≥$2M) where AI cannot identify property. Manual review.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 92,
+  "config": {
+   "conditions": [
+    {
+     "field": "gptImageType",
+     "operator": "eq",
+     "value": "unidentifiable"
+    },
+    {
+     "field": "priceUsd",
+     "operator": ">=",
+     "value": 2000000
+    }
+   ]
+  }
+ },
+ {
+  "name": "cars_model_check",
+  "listingCategory": "cars",
+  "displayName": "Cars: Known Non-Luxury Models",
+  "description": "Car title matches carModels list (known non-luxury models). Freemium only.",
+  "category": "auto_ai",
+  "tier": "verify",
+  "action": "flag",
+  "priority": 58,
+  "config": {
+   "listRef": "carModels",
+   "fields": [
+    "title"
+   ],
+   "categoryFilter": [
+    "cars"
+   ],
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "Your vehicle model does not appear to be in our luxury vehicle category. Please verify it qualifies for JamesEdition."
+ },
+ {
+  "name": "por_rentals_group",
+  "listingCategory": "real_estate",
+  "displayName": "POR Rentals by Group",
+  "description": "POR + rental type from specific groups. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 99,
+  "config": {
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "rentalOnly": true,
+   "groupFilter": [
+    "specific"
+   ]
+  },
+  "sellerMessage": "Price on Request rental listings are not accepted from this feed on JamesEdition."
+ },
+ {
+  "name": "netty_por_rentals",
+  "listingCategory": "real_estate",
+  "displayName": "POR Netty Rentals",
+  "description": "Group 1007 (Netty): POR + rental type. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 100,
+  "config": {
+   "groupFilter": [
+    "1007"
+   ],
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "rentalOnly": true
+  },
+  "sellerMessage": "Price on Request rental listings are not accepted from this feed on JamesEdition."
+ },
+ {
+  "name": "por_justimmo",
+  "listingCategory": "real_estate",
+  "displayName": "POR Justimmo Rentals",
+  "description": "Group 3761 (Justimmo): POR + rental type. Reject.",
+  "category": "simple_code",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 100,
+  "config": {
+   "groupFilter": [
+    "3761"
+   ],
+   "conditions": [
+    {
+     "field": "priceOnRequest",
+     "operator": "eq",
+     "value": true
+    }
+   ],
+   "rentalOnly": true
+  },
+  "sellerMessage": "Price on Request rental listings are not accepted from this feed on JamesEdition."
+ },
+ {
+  "name": "viktor_approval",
+  "listingCategory": "real_estate",
+  "displayName": "Viktor: Force Approve",
+  "description": "FeedLens force-approve flag is set.",
+  "category": "internal",
+  "tier": "auto",
+  "action": "approve",
+  "priority": 1,
+  "config": {
+   "conditions": [
+    {
+     "field": "viktorApprove",
+     "operator": "eq",
+     "value": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "viktor_autoreject",
+  "listingCategory": "real_estate",
+  "displayName": "Viktor: Force Reject",
+  "description": "FeedLens force-reject flag is set.",
+  "category": "internal",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 2,
+  "config": {
+   "conditions": [
+    {
+     "field": "viktorReject",
+     "operator": "eq",
+     "value": true
+    }
+   ]
+  },
+  "sellerMessage": "Your listing has been rejected by our moderation team. Please contact support for more information."
+ },
+ {
+  "name": "las_wrong_currency",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Wrong Currency",
+  "description": "LAS detected the listing price is in the wrong currency (e.g. MAD submitted as EUR, inflating price ~10×).",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 200,
+  "config": {
+   "accuracyFlag": "AI_WRONG_CURRENCY",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "We detected a potential currency mismatch on your listing. The price amount appears correct but the currency selected may be wrong. Please verify your price currency and resubmit."
+ },
+ {
+  "name": "las_absurd_price_scale",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Absurd Price Scale",
+  "description": "LAS detected an obvious scale error — extra zeros, cents entered as full units, or 100×/1000× magnitude mistake.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 201,
+  "config": {
+   "accuracyFlag": "AI_ABSURD_PRICE_SCALE",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "Your listing price appears to have a significant scale error (e.g. extra zeros). Please verify the price and resubmit."
+ },
+ {
+  "name": "las_surface_unit_mismatch",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Surface Unit Mismatch",
+  "description": "LAS detected area was entered in wrong units (e.g. sqft submitted as sqm, inflating area ~10×).",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 202,
+  "config": {
+   "accuracyFlag": "AI_SURFACE_UNIT_MISMATCH",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "The living or land area appears to be in the wrong unit (e.g. square feet entered as square meters). Please verify your area measurements and resubmit."
+ },
+ {
+  "name": "las_implausible_area",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Implausible Area for Type",
+  "description": "LAS detected area is physically impossible for the stated property type.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 203,
+  "config": {
+   "accuracyFlag": "AI_IMPLAUSIBLE_AREA_FOR_TYPE",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "The stated area appears implausible for this property type. Please verify the living area and property type, then resubmit."
+ },
+ {
+  "name": "las_wrong_property_type",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Wrong Property Type",
+  "description": "LAS detected the description clearly describes a different property type than the structured field.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 204,
+  "config": {
+   "accuracyFlag": "AI_WRONG_PROPERTY_TYPE",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "Your listing appears to be categorized under the wrong property type. Please update the property type to match the actual property and resubmit."
+ },
+ {
+  "name": "las_living_area_lt_10",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Living Area < 10 sqm",
+  "description": "LAS SQL flag: living area between 0 and 10 sqm — sub-10 sqm properties do not exist in this segment.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "reject",
+  "priority": 205,
+  "config": {
+   "accuracyFlag": "LIVING_AREA_LT_10_SQM",
+   "accountTypeFilter": [
+    "freemium"
+   ]
+  },
+  "sellerMessage": "Your listing shows a living area under 10 sqm, which appears to be a data error. Please verify the living area and resubmit."
+ },
+ {
+  "name": "las_location_mismatch",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Location Mismatch",
+  "description": "LAS detected the description places the property in a different location than the listed address. Auto-rejects freemium when AI confidence > 0.8.",
+  "category": "accuracy",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 206,
+  "config": {
+   "accuracyFlag": "AI_LOCATION_MISMATCH",
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "minConfidence": 0.8
+  },
+  "sellerMessage": "The property location in your description does not match the listed address. Please verify the address and coordinates, then resubmit."
+ },
+ {
+  "name": "las_price_outlier_segment",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Price Extreme vs Segment",
+  "description": "LAS detected price-per-sqm is so far outside the segment it almost certainly indicates a data error. Auto-rejects freemium when AI confidence > 0.8.",
+  "category": "accuracy",
+  "tier": "verify",
+  "action": "reject",
+  "priority": 207,
+  "config": {
+   "accuracyFlags": [
+    "AI_PPSQM_LIVING_EXTREME_VS_SEGMENT",
+    "AI_PPSQM_LAND_EXTREME_VS_SEGMENT"
+   ],
+   "matchAny": true,
+   "accountTypeFilter": [
+    "freemium"
+   ],
+   "minConfidence": 0.8
+  },
+  "sellerMessage": "The price per square meter for your listing is extremely unusual for this market segment. Please verify your price and area measurements."
+ },
+ {
+  "name": "las_structured_data_incomplete",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Structured Data Incomplete",
+  "description": "LAS detected the description explicitly states values that differ from or are missing in structured fields.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "notice",
+  "priority": 210,
+  "config": {
+   "accuracyFlag": "AI_STRUCTURED_DATA_INCOMPLETE"
+  },
+  "sellerMessage": "We detected discrepancies between your listing description and the structured property data (e.g. bedroom count, area). Please update the listing fields to match your description."
+ },
+ {
+  "name": "las_location_cluster_generic",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Generic Location Pin",
+  "description": "LAS detected the listing shares coordinates with many others and description has no specific building reference — likely a generic pin.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "notice",
+  "priority": 211,
+  "config": {
+   "accuracyFlag": "AI_LOCATION_CLUSTER_GENERIC"
+  },
+  "sellerMessage": "Your listing appears to use a generic location pin (e.g. city centre or office address). Please provide more precise coordinates for your property."
+ },
+ {
+  "name": "las_location_imprecise",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Imprecise Location",
+  "description": "LAS detected coordinates appear to be a placeholder (office address, city centre pin) — not cluster-related.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "notice",
+  "priority": 212,
+  "config": {
+   "accuracyFlag": "AI_LOCATION_IMPRECISE"
+  },
+  "sellerMessage": "The location data for your listing appears imprecise. Please provide a more specific address or coordinates."
+ },
+ {
+  "name": "las_stale_listing",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Stale Listing",
+  "description": "LAS detected the listing appears outdated based on creation/update dates and description content.",
+  "category": "accuracy",
+  "tier": "auto",
+  "action": "notice",
+  "priority": 213,
+  "config": {
+   "accuracyFlag": "AI_STALE_LISTING"
+  },
+  "sellerMessage": "Your listing appears to be outdated. Please verify the listing is still active and update the description and photos if needed."
+ },
+ {
+  "name": "las_score_critical",
+  "listingCategory": "real_estate",
+  "displayName": "LAS: Critical Accuracy Score",
+  "description": "LAS composite accuracy score below 0.4 — routes to manual queue for review regardless of individual flags.",
+  "category": "accuracy",
+  "tier": "manual",
+  "action": "flag",
+  "priority": 220,
+  "config": {
+   "maxAccuracyScore": 0.4
+  },
+  "sellerMessage": "Your listing has been flagged for a data quality review. Our team will check the listing details shortly."
+ }
+]
