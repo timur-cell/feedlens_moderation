@@ -40,6 +40,34 @@ async function expectVisible(page: Page, name: string, selector: string, timeout
   }
 }
 
+type ApiResult = { ok: boolean; status: number; json: any };
+
+// Run API calls inside the page (shares cookies; avoids a playwright-core
+// page.request incompatibility under bun).
+async function api(page: Page, method: string, path: string, body?: unknown): Promise<ApiResult> {
+  return await page.evaluate(
+    async ({ method, path, body }) => {
+      const tokenRes = await fetch("/api/session", { credentials: "same-origin" });
+      const tokenJson = await tokenRes.json();
+      const res = await fetch(path, {
+        method,
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(method !== "GET" ? { "X-CSRF-Token": tokenJson.csrfToken } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {}
+      return { ok: res.ok, status: res.status, json };
+    },
+    { method, path, body },
+  );
+}
+
 async function main() {
   // E2E_CHROMIUM_PATH: use a preinstalled Chromium when Playwright's CDN is
   // unreachable (this sandbox blocks cdn.playwright.dev).
@@ -76,46 +104,38 @@ async function main() {
   await page.goto("/moderation-log");
   await expectVisible(page, "moderation log renders", "text=/Moderation Log|History|No results/i");
 
-  // CSRF token for direct API requests (cookies are shared with the page)
-  const session = await (await page.request.get(`${BASE}/api/session`)).json();
-  const csrf: Record<string, string> = { "X-CSRF-Token": session.csrfToken };
-
   // ── Rules + CRUD round-trip ────────────────────────────────────
   console.log("Rules CRUD");
   await page.goto("/rules");
   await expectVisible(page, "rules list shows seeded rule", "text=Low LQI");
 
   const ruleName = `e2e_rule_${Date.now()}`;
-  const createRule = await page.request.post(`${BASE}/api/rules`, {
-    headers: csrf,
-    data: {
-      name: ruleName,
-      displayName: "E2E Test Rule",
-      category: "simple_code",
-      tier: "auto",
-      enabled: true,
-      action: "notice",
-      priority: 999,
-      config: { conditions: [{ field: "lqi", operator: "<", value: 1 }] },
-    },
+  const createRule = await api(page, "POST", "/api/rules", {
+    name: ruleName,
+    displayName: "E2E Test Rule",
+    category: "simple_code",
+    tier: "auto",
+    enabled: true,
+    action: "notice",
+    priority: 999,
+    config: { conditions: [{ field: "lqi", operator: "<", value: 1 }] },
   });
-  ok("rule create API (session cookie)", createRule.ok(), String(createRule.status()));
+  ok("rule create API (session cookie)", createRule.ok, String(createRule.status));
   await page.reload();
   await expectVisible(page, "created rule visible in UI", "text=E2E Test Rule");
 
-  const rules = await (await page.request.get(`${BASE}/api/rules`)).json();
+  const rules = (await api(page, "GET", "/api/rules")).json;
   const created = rules.find((r: { name: string }) => r.name === ruleName);
   ok("created rule present in API list", Boolean(created));
 
   if (created) {
-    const upd = await page.request.patch(`${BASE}/api/rules/${created._id}`, {
-      headers: csrf,
-      data: { displayName: "E2E Test Rule (edited)" },
+    const upd = await api(page, "PATCH", `/api/rules/${created._id}`, {
+      displayName: "E2E Test Rule (edited)",
     });
-    ok("rule update", upd.ok(), String(upd.status()));
-    const del = await page.request.delete(`${BASE}/api/rules/${created._id}`, { headers: csrf });
-    ok("rule delete", del.ok(), String(del.status()));
-    const after = await (await page.request.get(`${BASE}/api/rules`)).json();
+    ok("rule update", upd.ok, String(upd.status));
+    const del = await api(page, "DELETE", `/api/rules/${created._id}`);
+    ok("rule delete", del.ok, String(del.status));
+    const after = (await api(page, "GET", "/api/rules")).json;
     ok("rule gone after delete", !after.some((r: { name: string }) => r.name === ruleName));
   }
 
@@ -137,16 +157,12 @@ async function main() {
   // ── Moderate by ID (full flow against mock JE) ────────────────
   console.log("Moderate by ID");
   await page.goto("/moderate-by-id");
-  await expectVisible(page, "moderate-by-id page renders", "text=/Moderate by ID|JE ID/i");
+  await expectVisible(page, "moderate-by-id page renders", "text=/Moderate by URL|Moderate by ID/i");
 
-  const modResp = await page.request.post(`${BASE}/api/moderate-by-id`, {
-    headers: csrf,
-    data: { inputs: [MOCK_JE_ID] },
-    timeout: 60000,
-  });
-  ok("moderate-by-id API succeeds", modResp.ok(), String(modResp.status()));
-  if (modResp.ok()) {
-    const body = await modResp.json();
+  const modResp = await api(page, "POST", "/api/moderate-by-id", { inputs: [MOCK_JE_ID] });
+  ok("moderate-by-id API succeeds", modResp.ok, String(modResp.status));
+  if (modResp.ok) {
+    const body = modResp.json;
     ok("moderate-by-id returns a result", body.count === 1 && body.results?.length === 1);
     const r = body.results?.[0];
     ok(
@@ -154,9 +170,7 @@ async function main() {
       Boolean(r && r.jeId === MOCK_JE_ID && r.outcome),
       JSON.stringify(r ?? {}),
     );
-    const latest = await (
-      await page.request.get(`${BASE}/api/moderation-results/latest-by-je-id/${MOCK_JE_ID}`)
-    ).json();
+    const latest = (await api(page, "GET", `/api/moderation-results/latest-by-je-id/${MOCK_JE_ID}`)).json;
     ok("moderation result persisted", Boolean(latest && latest.jeId === MOCK_JE_ID));
   }
 
@@ -168,8 +182,8 @@ async function main() {
   await expectVisible(page, "team tab lists admin user", `text=${ADMIN_EMAIL}`);
 
   // ── Sign out ───────────────────────────────────────────────────
-  const out = await page.request.delete(`${BASE}/api/session`, { headers: csrf });
-  ok("sign out", out.status() === 204 || out.ok(), String(out.status()));
+  const out = await api(page, "DELETE", "/api/session");
+  ok("sign out", out.status === 204 || out.ok, String(out.status));
 
   await browser.close();
 
