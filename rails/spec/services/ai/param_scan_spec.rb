@@ -164,9 +164,11 @@ RSpec.describe Ai::ParamScan do
       described_class.run_deterministic_checks(params)
     end
 
-    it "flags absurd price per sqm" do
-      flags = check("price" => 5_600_000.0, "livingArea" => 5_600_000.0)
+    it "flags absurd price per sqm, impossible areas and copy-paste areas" do
+      flags = check("price" => 5_600_000.0, "livingArea" => 5_600_000.0, "landArea" => 5_600_000.0)
       expect(flags.map { |f| f["code"] }).to include("PRICE_PER_SQM_ANOMALY", "AREA_MISMATCH", "DATA_ENTRY_ERROR")
+      anomaly = flags.find { |f| f["code"] == "PRICE_PER_SQM_ANOMALY" }
+      expect(anomaly["message"]).to include("$1/sqm — far below $10/sqm minimum")
     end
 
     it "skips price checks for price-on-request listings" do
