@@ -26,11 +26,13 @@ RUN apt-get update -qq && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Prebuilt Ruby (ruby/ruby-builder toolcache tarball, extracts as x64/)
-RUN curl -fsSL -o /tmp/ruby.tar.gz \
+# Prebuilt Ruby (ruby/ruby-builder toolcache tarball). Its binstub shebangs
+# are baked to the GitHub Actions toolcache prefix, so extract it there.
+RUN mkdir -p "/opt/hostedtoolcache/Ruby/${RUBY_VERSION}" && \
+    curl -fsSL -o /tmp/ruby.tar.gz \
       "https://github.com/ruby/ruby-builder/releases/download/toolcache/ruby-${RUBY_VERSION}-ubuntu-24.04.tar.gz" && \
-    tar -xzf /tmp/ruby.tar.gz -C /tmp && \
-    mv /tmp/x64 /opt/ruby && \
+    tar -xzf /tmp/ruby.tar.gz -C "/opt/hostedtoolcache/Ruby/${RUBY_VERSION}" && \
+    ln -s "/opt/hostedtoolcache/Ruby/${RUBY_VERSION}/x64" /opt/ruby && \
     rm /tmp/ruby.tar.gz
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
