@@ -36,7 +36,7 @@ http.route({
     }
 
     try {
-      const response = await fetch(imageUrl, {
+      const response = await fetch(target.href, {
         headers: {
           "Accept": "*/*",
           // No User-Agent = no CDN 500 error
