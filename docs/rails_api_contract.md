@@ -24,7 +24,7 @@ Behavior parity target: the Convex implementation in `convex/` (read it when amb
 | Method & path | Auth | Body / params | Returns |
 |---|---|---|---|
 | `GET /api/session` | none | — | 200 `{ user: ModeratorDoc \| null, csrfToken }` |
-| `POST /api/session` | none | `{ email, password }` | 200 `{ user }`; 401 on bad creds; updates `lastLoginAt`, sets status invited→active |
+| `POST /api/session` | none | `{ email, password }` | 200 `{ user, csrfToken }`; 401 on bad creds; updates `lastLoginAt`, sets status invited→active |
 | `DELETE /api/session` | session | — | 204 |
 | `POST /api/password` | none | `{ email }` | 200 always (sends Devise reset mail if SMTP configured) |
 | `PUT /api/password` | none | `{ token, password }` | 200 / 422 |
