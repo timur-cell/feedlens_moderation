@@ -41,7 +41,12 @@ async function expectVisible(page: Page, name: string, selector: string, timeout
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  // E2E_CHROMIUM_PATH: use a preinstalled Chromium when Playwright's CDN is
+  // unreachable (this sandbox blocks cdn.playwright.dev).
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.E2E_CHROMIUM_PATH || undefined,
+  });
   const page = await browser.newPage({ baseURL: BASE });
   page.setDefaultTimeout(20000);
 
