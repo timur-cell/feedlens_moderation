@@ -1,0 +1,83 @@
+# FeedLens Moderation — full stack: PostgreSQL + Rails (web + jobs) + React SPA.
+#
+# Boot:   docker compose up --build
+# App:    http://localhost:8080  (login with ADMIN_EMAIL / ADMIN_PASSWORD)
+#
+# Base images are pulled from mirror.gcr.io — Google's byte-identical mirror of
+# Docker Hub official images — to avoid anonymous Docker Hub pull rate limits.
+# Override with BASE_REGISTRY=docker.io if you prefer.
+
+services:
+  db:
+    image: ${BASE_REGISTRY:-mirror.gcr.io}/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: ./rails
+      args:
+        BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
+    environment: &rails_env
+      RAILS_ENV: production
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-insecure-compose-only-secret-key-base-change-me-0123456789abcdef}
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      DATABASE_NAME: feedlens_production
+      QUEUE_DATABASE_NAME: feedlens_production_queue
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@feedlens.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-FeedLens!2026}
+      DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-FeedLens!2026}
+      LAS_PUSH_API_KEY: ${LAS_PUSH_API_KEY:-dev-las-push-key}
+      IMPLIO_STUB: ${IMPLIO_STUB:-true}
+      IMPLIO_API_KEY: ${IMPLIO_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      APP_HOST: ${APP_HOST:-localhost}
+      APP_PORT: ${APP_PORT:-8080}
+      RAILS_LOG_TO_STDOUT: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  jobs:
+    build:
+      context: ./rails
+      args:
+        BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
+    command: ["./bin/jobs"]
+    environment: *rails_env
+    depends_on:
+      web:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
