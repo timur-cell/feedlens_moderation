@@ -22,10 +22,10 @@ RSpec.describe "Moderation::Engine golden fixtures" do
     next
   end
 
-  seed_rules = JSON.parse(File.read(File.join(rails_root, "db/seed_data/rules.json")))
-  seed_lists = JSON.parse(File.read(File.join(rails_root, "db/seed_data/lists.json")))
-  fixtures_doc = JSON.parse(File.read(fixtures_path))
-  expected = JSON.parse(File.read(expected_path))
+  seed_rules = JSON.parse(File.read(File.join(rails_root, "db/seed_data/rules.json"), encoding: "UTF-8"))
+  seed_lists = JSON.parse(File.read(File.join(rails_root, "db/seed_data/lists.json"), encoding: "UTF-8"))
+  fixtures_doc = JSON.parse(File.read(fixtures_path, encoding: "UTF-8"))
+  expected = JSON.parse(File.read(expected_path, encoding: "UTF-8"))
 
   engine = Moderation::Engine.new(
     rules: seed_rules + fixtures_doc["extraRules"],
