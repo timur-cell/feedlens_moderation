@@ -3,6 +3,8 @@ import { createAccount, retrieveAccount } from "@convex-dev/auth/server";
 import { Scrypt } from "lucia";
 import type { DataModel } from "./_generated/dataModel";
 
+declare const process: { env: Record<string, string | undefined> };
+
 /**
  * Direct credentials provider — allows admin-created accounts to log in
  * with email + password (no email verification needed).
@@ -32,6 +34,12 @@ export const TestCredentials = ConvexCredentials<DataModel>({
     }
 
     if (flow === "signUp") {
+      // Self-signup through this provider is for Playwright test accounts
+      // only. Sign-in must work everywhere (admin-created accounts use this
+      // provider), but account creation stays preview-only.
+      if (process.env.VIKTOR_SPACES_IS_PREVIEW !== "true") {
+        throw new Error("Sign-up via credentials is disabled in production");
+      }
       try {
         const existing = await retrieveAccount(ctx, {
           provider: "test",

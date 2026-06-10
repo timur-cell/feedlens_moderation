@@ -42,7 +42,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       verify: ViktorSpacesEmail,
       reset: ViktorSpacesPasswordReset,
     }),
-    ...(process.env.VIKTOR_SPACES_IS_PREVIEW === "true" ? [TestCredentials] : []),
+    // Always enabled: admin-created accounts authenticate through this
+    // provider, including on prod. Its self-signup flow stays preview-only
+    // (gated inside testAuth.ts).
+    TestCredentials,
   ],
 });
 
