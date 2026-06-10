@@ -6,7 +6,11 @@ module Listings
   # mobile API -> search API -> HTML scrape fallback chain, plus the
   # European-aware price parsing and location/area normalization.
   class JeClient
-    BASE_URL = "https://www.jamesedition.com".freeze
+    # Overridable for e2e environments where jamesedition.com is unreachable
+    # (docker-compose.e2e.yml points this at a mock server).
+    def self.base_url
+      ENV.fetch("JE_API_BASE", "https://www.jamesedition.com")
+    end
     USER_AGENT = "FeedLens/1.0".freeze
     HTML_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36".freeze
     OPEN_TIMEOUT = 10
@@ -54,7 +58,7 @@ module Listings
         data = fetch_from_search_api(je_id)
         return { data: data, source: "search_api" } if data
 
-        data = fetch_from_html(je_id, url || "#{BASE_URL}/listing/#{je_id}")
+        data = fetch_from_html(je_id, url || "#{base_url}/listing/#{je_id}")
         return { data: data, source: "html_scrape" } if data
 
         nil
@@ -62,7 +66,7 @@ module Listings
 
       # ─── Mobile API (primary source) ──────────────────────────────────
       def fetch_from_mobile_api(je_id)
-        response = http_get("#{BASE_URL}/api/mobile/v1/listings/#{je_id}",
+        response = http_get("#{base_url}/api/mobile/v1/listings/#{je_id}",
                             headers: { "Accept" => "application/json", "User-Agent" => USER_AGENT })
         return nil unless response&.code == "200"
 
@@ -104,7 +108,7 @@ module Listings
           description_length: description&.length,
           description: description&.slice(0, 5000),
           office: presence(listing["office_name"]),
-          listing_url: presence(listing["url"]) || "#{BASE_URL}/real_estate/#{je_id}",
+          listing_url: presence(listing["url"]) || "#{base_url}/real_estate/#{je_id}",
           raw_data: {
             "source" => "mobile_api",
             "latitude" => listing["latitude"],
@@ -127,7 +131,7 @@ module Listings
 
       # ─── Search API (fallback for 500s from the single-listing API) ───
       def fetch_from_search_api(je_id)
-        response = http_get("#{BASE_URL}/api/mobile/v1/listings?listing_id=#{je_id}",
+        response = http_get("#{base_url}/api/mobile/v1/listings?listing_id=#{je_id}",
                             headers: { "Accept" => "application/json", "User-Agent" => USER_AGENT })
         return nil unless response&.code == "200"
 
@@ -163,7 +167,7 @@ module Listings
           image_count: all_images.empty? ? nil : all_images.length,
           image_urls: all_images.empty? ? nil : all_images.first(30),
           office: presence(listing["office_name"]),
-          listing_url: "#{BASE_URL}/listing/#{je_id}",
+          listing_url: "#{base_url}/listing/#{je_id}",
           raw_data: {
             "source" => "search_api",
             "isNew" => listing["is_new"],
@@ -349,7 +353,7 @@ module Listings
       private
 
       def listing_info_from_mobile_api(je_id)
-        response = http_get("#{BASE_URL}/api/mobile/v1/listings/#{je_id}",
+        response = http_get("#{base_url}/api/mobile/v1/listings/#{je_id}",
                             headers: { "Accept" => "application/json", "User-Agent" => USER_AGENT })
         return nil unless response&.code == "200"
 
@@ -365,7 +369,7 @@ module Listings
         {
           "jeId" => je_id,
           "title" => js_or(listing["headline"], "Listing #{je_id}"),
-          "listingUrl" => js_or(listing["url"], "#{BASE_URL}/listing/#{je_id}"),
+          "listingUrl" => js_or(listing["url"], "#{base_url}/listing/#{je_id}"),
           "price" => parsed&.dig(:price),
           "currency" => parsed&.dig(:currency),
           "country" => parts.length >= 2 ? parts.last : parts.first,
@@ -384,7 +388,7 @@ module Listings
       end
 
       def listing_info_from_search_api(je_id)
-        response = http_get("#{BASE_URL}/api/mobile/v1/listings?listing_id=#{je_id}",
+        response = http_get("#{base_url}/api/mobile/v1/listings?listing_id=#{je_id}",
                             headers: { "Accept" => "application/json", "User-Agent" => USER_AGENT })
         return nil unless response&.code == "200"
 
@@ -400,7 +404,7 @@ module Listings
         {
           "jeId" => je_id,
           "title" => js_or(listing["headline"], "Listing #{je_id}"),
-          "listingUrl" => "#{BASE_URL}/listing/#{je_id}",
+          "listingUrl" => "#{base_url}/listing/#{je_id}",
           "price" => parsed&.dig(:price),
           "currency" => parsed&.dig(:currency),
           "country" => parts.length >= 2 ? parts.last : parts.first,
