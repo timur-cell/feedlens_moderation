@@ -1,4 +1,3 @@
-import { useAction, useMutation, useQuery } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import {
   ShieldCheck,
@@ -28,7 +27,9 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../convex/_generated/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -151,7 +152,10 @@ function truncateEmail(str?: string): string {
 // ─── Items Matched Preview ───────────────────────────────────────
 
 function ItemsMatchedByRule({ ruleName }: { ruleName: string }) {
-  const matchedData = useQuery(api.moderation.getResultsByRule, { ruleName, limit: 20 });
+  const { data: matchedData } = useApiQuery(apiClient.moderation.byRule, {
+    ruleName,
+    limit: 20,
+  });
 
   if (!matchedData) {
     return (
@@ -352,8 +356,8 @@ function RulePreviewDialog({ rule, open, onClose }: { rule: any; open: boolean; 
 // ─── Rule Editor Dialog ─────────────────────────────────────────
 
 function RuleEditorDialog({ rule, open, onClose }: { rule: any; open: boolean; onClose: () => void }) {
-  const updateRule = useMutation(api.rules.update);
-  const currentUser = useQuery(api.auth.currentUser);
+  const [updateRule] = useApiMutation(apiClient.rules.update);
+  const { user: currentUser } = useAuth();
   const [displayName, setDisplayName] = useState(rule?.displayName || "");
   const [description, setDescription] = useState(rule?.description || "");
   const [tier, setTier] = useState(rule?.tier || "manual");
@@ -463,9 +467,9 @@ function RuleEditorDialog({ rule, open, onClose }: { rule: any; open: boolean; o
 // ─── Create Rule Dialog ─────────────────────────────────────────
 
 function CreateRuleDialog({ open, onClose, existingRuleNames }: { open: boolean; onClose: () => void; existingRuleNames: string[] }) {
-  const createRule = useMutation(api.rules.create);
-  const suggestRule = useAction(api.rulesAi.suggestRule);
-  const currentUser = useQuery(api.auth.currentUser);
+  const [createRule] = useApiMutation(apiClient.rules.create);
+  const [suggestRule] = useApiMutation(apiClient.rules.suggest);
+  const { user: currentUser } = useAuth();
   const [mode, setMode] = useState<"manual" | "ai">("ai");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDescription, setAiDescription] = useState("");
@@ -669,10 +673,9 @@ function CreateRuleDialog({ open, onClose, existingRuleNames }: { open: boolean;
 // ─── Main Page: Table Layout ────────────────────────────────────
 
 export default function RulesPage() {
-  const rules = useQuery(api.rules.list);
-  const currentUser = useQuery(api.auth.currentUser);
-  const toggleEnabled = useMutation(api.rules.toggleEnabled);
-  const removeRule = useMutation(api.rules.remove);
+  const { data: rules } = useApiQuery(apiClient.rules.list);
+  const [toggleEnabled] = useApiMutation(apiClient.rules.toggle);
+  const [removeRule] = useApiMutation(apiClient.rules.remove);
 
   const [editingRule, setEditingRule] = useState<any>(null);
   const [previewRule, setPreviewRule] = useState<any>(null);
@@ -707,10 +710,10 @@ export default function RulesPage() {
   const enabledCount = rules.filter((r: any) => r.enabled).length;
 
   const handleToggle = (rule: any) => {
-    toggleEnabled({
-      id: rule._id,
-      modifiedBy: currentUser?.email || currentUser?.name || "unknown",
-    }).catch(() => toast.error(`Failed to toggle rule "${rule.displayName}"`));
+    // The Rails API attributes the change to the session user.
+    toggleEnabled({ id: rule._id }).catch(() =>
+      toast.error(`Failed to toggle rule "${rule.displayName}"`),
+    );
   };
 
   const handleDelete = async () => {

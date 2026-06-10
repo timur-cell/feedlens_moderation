@@ -1,4 +1,3 @@
-import { useAction, useMutation, useQuery } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import {
   CheckCircle2,
@@ -31,7 +30,8 @@ import {
   // ShieldAlert, Activity — removed with LAS UI (hidden 2026-03-17)
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -198,10 +198,12 @@ function DismissableRulePills({
 }
 
 /* ─── Moderation Notes Panel ──────────────────────────────────── */
-function ModerationNotes({ listingId, jeId }: { listingId: string; jeId: string }) {
-  const notes = useQuery(api.notes.listByListing, { listingId: listingId as any });
-  const addNote = useMutation(api.notes.add);
-  const removeNote = useMutation(api.notes.remove);
+function ModerationNotes({ listingId }: { listingId: string }) {
+  const { data: notes } = useApiQuery(apiClient.notes.listByListing, {
+    listingId,
+  });
+  const [addNote] = useApiMutation(apiClient.notes.add);
+  const [removeNote] = useApiMutation(apiClient.notes.remove);
   const [newNote, setNewNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -209,11 +211,9 @@ function ModerationNotes({ listingId, jeId }: { listingId: string; jeId: string 
     if (!newNote.trim()) return;
     setIsSubmitting(true);
     try {
+      // The author is the session user on the Rails side.
       await addNote({
-        listingId: listingId as any,
-        jeId,
-        authorName: "Test User",
-        authorRole: "moderator",
+        listingId,
         content: newNote.trim(),
       });
       setNewNote("");
@@ -227,7 +227,7 @@ function ModerationNotes({ listingId, jeId }: { listingId: string; jeId: string 
 
   const handleDelete = async (noteId: string) => {
     try {
-      await removeNote({ id: noteId as any });
+      await removeNote({ id: noteId });
       toast.success("Note deleted");
     } catch {
       toast.error("Failed to delete note");
@@ -465,10 +465,13 @@ function ListingCard({ listing }: { listing: QueueListing }) {
   const [reason, setReason] = useState("");
   const [refuseReasonType, setRefuseReasonType] = useState("other");
   const [dismissedRules, setDismissedRules] = useState<Set<string>>(new Set());
-  const results = useQuery(api.moderation.getResultsForListing, { listingId: listing._id as any });
-  const templates = useQuery(api.messages.list);
-  const overrideDecision = useMutation(api.moderation.overrideDecision);
-  const overrideWithImplio = useAction(api.moderation.overrideWithImplio);
+  const { data: results } = useApiQuery(apiClient.moderation.forListing, {
+    listingId: listing._id,
+  });
+  const { data: templates } = useApiQuery(apiClient.messages.list);
+  const [overrideWithImplio] = useApiMutation(
+    apiClient.moderation.overrideWithImplio,
+  );
 
   const result = results?.[0];
   const ruleMatches = result?.ruleMatches || [];
@@ -496,13 +499,13 @@ function ListingCard({ listing }: { listing: QueueListing }) {
     }
     setActionLoading(true);
     try {
-      // Use overrideWithImplio action that also submits to Implio
+      // Use overrideWithImplio that also submits to Implio; the override is
+      // attributed to the session moderator on the Rails side.
       await overrideWithImplio({
         resultId: result._id,
         newOutcome: action,
         reason: reason || undefined,
         sellerMessage: action === "approved" ? undefined : message || undefined,
-        overriddenBy: "manual",
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
       });
       toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"} — synced to Implio`);
@@ -721,7 +724,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
 
               {/* Moderation Notes (toggle) */}
               {showNotes && (
-                <ModerationNotes listingId={listing._id} jeId={listing.jeId} />
+                <ModerationNotes listingId={listing._id} />
               )}
 
               {/* Action buttons */}
@@ -917,7 +920,9 @@ function ListingCard({ listing }: { listing: QueueListing }) {
 }
 
 export default function QueuePage() {
-  const listings = useQuery(api.listings.listPending);
+  const { data: listings } = useApiQuery(apiClient.listings.pending, undefined, {
+    pollMs: 10000,
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">

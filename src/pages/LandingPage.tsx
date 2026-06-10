@@ -1,4 +1,3 @@
-import { useConvexAuth } from "convex/react";
 import {
   ArrowRight,
   Check,
@@ -11,9 +10,10 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function LandingPage() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

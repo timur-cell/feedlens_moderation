@@ -1,4 +1,3 @@
-import { useAction, useMutation, useQuery } from "convex/react";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   Users,
@@ -20,7 +19,8 @@ import {
   KeyRound,
 } from "lucide-react";
 import { useState } from "react";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 /* ─── Add User Dialog ─────────────────────────────────────────── */
 function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const createUserWithLogin = useAction(api.adminUsers.createUserWithLogin);
+  const [createUserWithLogin] = useApiMutation(apiClient.users.create);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("moderator");
@@ -286,7 +286,7 @@ function SetPasswordDialog({
   onClose: () => void;
   user: { name: string; email: string } | null;
 }) {
-  const setUserPassword = useAction(api.adminUsers.setUserPassword);
+  const [setUserPassword] = useApiMutation(apiClient.users.setPassword);
   const [password, setPassword] = useState(generatePassword);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -415,7 +415,10 @@ function SetPasswordDialog({
 
 /* ─── Activity Log ────────────────────────────────────────────── */
 function ActivityLog({ moderatorId }: { moderatorId: any }) {
-  const activity = useQuery(api.users.getUserActivity, { moderatorId, limit: 10 });
+  const { data: activity } = useApiQuery(apiClient.users.activity, {
+    moderatorId,
+    limit: 10,
+  });
 
   if (!activity) {
     return (
@@ -472,9 +475,9 @@ function ActivityLog({ moderatorId }: { moderatorId: any }) {
 /* ─── User Row ────────────────────────────────────────────────── */
 function UserRow({ user, onSetPassword }: { user: any; onSetPassword: (user: any) => void }) {
   const [expanded, setExpanded] = useState(false);
-  const updateUser = useMutation(api.users.updateUser);
-  const deleteUser = useMutation(api.users.deleteUser);
-  const reactivateUser = useMutation(api.users.reactivateUser);
+  const [updateUser] = useApiMutation(apiClient.users.update);
+  const [deleteUser] = useApiMutation(apiClient.users.remove);
+  const [reactivateUser] = useApiMutation(apiClient.users.reactivate);
 
   const role = roleConfig[user.role] || roleConfig.viewer;
   const status = statusConfig[user.status] || statusConfig.invited;
@@ -628,8 +631,8 @@ function UserRow({ user, onSetPassword }: { user: any; onSetPassword: (user: any
 
 /* ─── Main Page ───────────────────────────────────────────────── */
 export default function UsersPage() {
-  const users = useQuery(api.users.listUsers);
-  const stats = useQuery(api.users.getStats);
+  const { data: users } = useApiQuery(apiClient.users.list);
+  const { data: stats } = useApiQuery(apiClient.users.stats);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState("all");

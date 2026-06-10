@@ -14,6 +14,12 @@ export default defineConfig({
     },
   },
   cacheDir: "/tmp/vite-cache-feedlens",
+  server: {
+    proxy: {
+      "/api": "http://localhost:3000",
+      "/image-proxy": "http://localhost:3000",
+    },
+  },
   build: {
     write: true,
   },

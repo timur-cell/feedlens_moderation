@@ -1,4 +1,3 @@
-import { useAction, useMutation, useQuery } from "convex/react";
 import {
   List,
   Search,
@@ -18,7 +17,8 @@ import {
   Check,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -253,8 +253,8 @@ function CreateListDialog({
   onClose: () => void;
   existingCategories: string[];
 }) {
-  const createList = useMutation(api.lists.create);
-  const suggestList = useAction(api.listsAi.suggestList);
+  const [createList] = useApiMutation(apiClient.lists.create);
+  const [suggestList] = useApiMutation(apiClient.lists.suggest);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"manual" | "ai">("ai");
   const [aiLoading, setAiLoading] = useState(false);
@@ -662,9 +662,9 @@ function EditListDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const updateList = useMutation(api.lists.update);
-  const addItem = useMutation(api.lists.addItem);
-  const removeItem = useMutation(api.lists.removeItem);
+  const [updateList] = useApiMutation(apiClient.lists.update);
+  const [addItem] = useApiMutation(apiClient.lists.addItem);
+  const [removeItem] = useApiMutation(apiClient.lists.removeItem);
   const [newItemValue, setNewItemValue] = useState("");
   const [newItemType, setNewItemType] = useState<"exact" | "regex">("exact");
   const [saving, setSaving] = useState(false);
@@ -841,10 +841,12 @@ function EditListDialog({
 }
 
 export default function ListsPage() {
-  const lists = useQuery(api.lists.list) as ModerationList[] | undefined;
-  const rules = useQuery(api.rules.list) || [];
-  const seedLists = useMutation(api.seedLists.seedAllLists);
-  const deleteList = useMutation(api.lists.remove);
+  const { data: listsData } = useApiQuery(apiClient.lists.list);
+  const lists = listsData as ModerationList[] | undefined;
+  const { data: rulesData } = useApiQuery(apiClient.rules.list);
+  const rules = rulesData || [];
+  const [seedLists] = useApiMutation(apiClient.lists.seed);
+  const [deleteList] = useApiMutation(apiClient.lists.remove);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");

@@ -1,4 +1,3 @@
-import { useQuery } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import {
   CheckCircle2,
@@ -23,7 +22,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../convex/_generated/api";
+import { useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -461,13 +461,21 @@ export default function ModerationLogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [aiScanFilter, setAiScanFilter] = useState<string>("all"); // "all", "flagged", "reject", "review", "ok"
 
-  const allResults = useQuery(api.moderation.getRecentResults, { limit: 200 });
-  const filteredResults = useQuery(api.moderation.getResultsByOutcome,
-    outcomeFilter !== "all" ? { outcome: outcomeFilter, limit: 100 } : "skip"
+  const { data: allResults } = useApiQuery(apiClient.moderation.recent, {
+    limit: 200,
+  });
+  const { data: filteredResults } = useApiQuery(
+    apiClient.moderation.byOutcome,
+    { outcome: outcomeFilter, limit: 100 },
+    { enabled: outcomeFilter !== "all" },
   );
   const results = outcomeFilter !== "all" ? filteredResults : allResults;
-  const allListings = useQuery(api.listings.listRecent, { limit: 200 });
-  const allScans = useQuery(api.aiParamScan.getRecentScans, { limit: 300 });
+  const { data: allListings } = useApiQuery(apiClient.listings.recent, {
+    limit: 200,
+  });
+  const { data: allScans } = useApiQuery(apiClient.paramScans.recent, {
+    limit: 300,
+  });
 
   const listingMap = new Map((allListings || []).map((l: any) => [l._id, l]));
   const scanMap = new Map((allScans || []).map((s: any) => [s.listingId, s]));

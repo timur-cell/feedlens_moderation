@@ -1,6 +1,6 @@
+import { UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
-import { SignUp } from "@/components/SignUp";
-import { TestUserLoginSection } from "@/components/TestUserLoginSection";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export function SignupPage() {
@@ -20,12 +20,27 @@ export function SignupPage() {
             Create an account
           </h1>
           <p className="text-muted-foreground text-sm">
-            Get started with your free account
+            Accounts are managed by your team
           </p>
         </div>
 
-        <TestUserLoginSection />
-        <SignUp />
+        <Card variant="elevated">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-3">
+              <div className="mx-auto size-12 rounded-full bg-muted flex items-center justify-center">
+                <UserPlus className="size-6 text-muted-foreground" />
+              </div>
+              <h2 className="font-semibold text-lg">
+                Accounts are created by an administrator
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Self-registration is disabled. Ask an administrator to create
+                an account for you, then sign in with the credentials they
+                share.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}

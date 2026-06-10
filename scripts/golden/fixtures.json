@@ -1,0 +1,813 @@
+{
+  "comment": "Golden fixtures for the Ruby port of convex/moderation.ts. extraRules/extraLists are SYNTHETIC (marked synthetic:true, names prefixed x_) — they exist to exercise evaluator paths the seed data never reaches (hybrid_vision, office rules, uncovered operators). They are still executed by the REAL TS evaluators in scripts/golden/generate.ts. Each fixture carries an `expect` block that the generator validates to guarantee the fixture is not degenerate.",
+  "extraLists": [
+    {
+      "name": "golden_mixed",
+      "displayName": "Golden mixed list (synthetic)",
+      "synthetic": true,
+      "items": [
+        { "value": "FooBar Estate", "type": "exact" },
+        { "value": "/\\bqux+\\b/i", "type": "regex", "pattern": "\\bqux+\\b", "flags": "i" }
+      ]
+    }
+  ],
+  "extraRules": [
+    {
+      "name": "x_op_in",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 510,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "city", "operator": "in", "value": [ "Madrid", "Lisbon" ] } ]
+      },
+      "sellerMessage": "OPS:in"
+    },
+    {
+      "name": "x_op_in_scalar",
+      "synthetic": true,
+      "comment": "non-array target: `in` must return false",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 511,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "city", "operator": "in", "value": "Madrid" } ]
+      },
+      "sellerMessage": "OPS:in_scalar"
+    },
+    {
+      "name": "x_op_not_in",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 512,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "city", "operator": "not_in", "value": [ "Paris", "Rome" ] } ]
+      },
+      "sellerMessage": "OPS:not_in"
+    },
+    {
+      "name": "x_op_contains",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 513,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "title", "operator": "contains", "value": "penthouse" } ]
+      },
+      "sellerMessage": "OPS:contains"
+    },
+    {
+      "name": "x_op_not_contains",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 514,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "title", "operator": "not_contains", "value": "studio" } ]
+      },
+      "sellerMessage": "OPS:not_contains"
+    },
+    {
+      "name": "x_op_matches",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 515,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "title", "operator": "matches", "value": "\\bduplex\\s+unit\\b" } ]
+      },
+      "sellerMessage": "OPS:matches"
+    },
+    {
+      "name": "x_op_matches_invalid",
+      "synthetic": true,
+      "comment": "invalid regex: matches must rescue and return false",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 516,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "title", "operator": "matches", "value": "(unclosed" } ]
+      },
+      "sellerMessage": "OPS:matches_invalid"
+    },
+    {
+      "name": "x_op_empty",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 517,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "description", "operator": "empty", "value": true } ]
+      },
+      "sellerMessage": "OPS:empty"
+    },
+    {
+      "name": "x_op_not_empty",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 518,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "description", "operator": "not_empty", "value": true } ]
+      },
+      "sellerMessage": "OPS:not_empty"
+    },
+    {
+      "name": "x_op_is_true",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 519,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "rental", "operator": "is_true", "value": true } ]
+      },
+      "sellerMessage": "OPS:is_true"
+    },
+    {
+      "name": "x_op_is_false",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 520,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "outdated", "operator": "is_false", "value": true } ]
+      },
+      "sellerMessage": "OPS:is_false"
+    },
+    {
+      "name": "x_op_eq_float",
+      "synthetic": true,
+      "comment": "listing carries bedrooms 5.0 — JS String(5.0) === '5' must equal String(5)",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 521,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "bedrooms", "operator": "eq", "value": 5 } ]
+      },
+      "sellerMessage": "OPS:eq_float"
+    },
+    {
+      "name": "x_op_neq",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 522,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "realEstateType", "operator": "neq", "value": "apartment" } ]
+      },
+      "sellerMessage": "OPS:neq"
+    },
+    {
+      "name": "x_op_gte_str",
+      "synthetic": true,
+      "comment": "string target — JS Number('50') coercion",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 523,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "lqi", "operator": ">=", "value": "50" } ]
+      },
+      "sellerMessage": "OPS:gte_str"
+    },
+    {
+      "name": "x_op_lt_nan",
+      "synthetic": true,
+      "comment": "Number(title) is NaN — NaN < 5 must be false, rule never fires",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 524,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "title", "operator": "lt", "value": 5 } ]
+      },
+      "sellerMessage": "OPS:lt_nan"
+    },
+    {
+      "name": "x_op_is_null",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 525,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "conditions": [ { "field": "year", "operator": "is_null", "value": true } ]
+      },
+      "sellerMessage": "OPS:is_null"
+    },
+    {
+      "name": "x_op_require_any",
+      "synthetic": true,
+      "comment": "requireAll:false — OR semantics over conditions",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 526,
+      "config": {
+        "feedSourceFilter": [ "golden_ops" ],
+        "requireAll": false,
+        "conditions": [
+          { "field": "bathrooms", "operator": ">=", "value": 99 },
+          { "field": "city", "operator": "eq", "value": "Madrid" }
+        ]
+      },
+      "sellerMessage": "OPS:require_any"
+    },
+    {
+      "name": "x_hv_scores",
+      "synthetic": true,
+      "category": "hybrid_vision",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 530,
+      "config": {
+        "countryFilter": [ "GR" ],
+        "scoreThresholds": { "condition": 2.5, "conclusion": 2.5 }
+      },
+      "sellerMessage": "HV scores reject."
+    },
+    {
+      "name": "x_hv_watermark",
+      "synthetic": true,
+      "category": "hybrid_vision",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 531,
+      "config": {
+        "countryFilter": [ "GR" ],
+        "checkType": "watermark",
+        "watermarkKeywords": [ "sold", "vendido" ]
+      },
+      "sellerMessage": "HV watermark reject."
+    },
+    {
+      "name": "x_hv_wm_size",
+      "synthetic": true,
+      "category": "hybrid_vision",
+      "tier": "verify",
+      "action": "flag",
+      "priority": 532,
+      "config": {
+        "countryFilter": [ "GR" ],
+        "checkType": "watermark_size",
+        "watermarkShareThreshold": 5
+      },
+      "sellerMessage": "HV watermark size flag."
+    },
+    {
+      "name": "x_hv_unident",
+      "synthetic": true,
+      "category": "hybrid_vision",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 533,
+      "config": {
+        "countryFilter": [ "GR" ],
+        "checkType": "unidentifiable"
+      },
+      "sellerMessage": "HV unidentifiable reject."
+    },
+    {
+      "name": "x_hv_wm_size_default",
+      "synthetic": true,
+      "comment": "no watermarkShareThreshold — the || 3 default applies",
+      "category": "hybrid_vision",
+      "tier": "verify",
+      "action": "flag",
+      "priority": 534,
+      "config": {
+        "countryFilter": [ "MT" ],
+        "checkType": "watermark_size"
+      },
+      "sellerMessage": "HV watermark size default flag."
+    },
+    {
+      "name": "x_office_names",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "manual",
+      "action": "flag",
+      "priority": 540,
+      "config": {
+        "officeNames": [ "sunset realty" ]
+      },
+      "sellerMessage": "Office flagged for review."
+    },
+    {
+      "name": "x_office_ids",
+      "synthetic": true,
+      "comment": "numeric id in config vs string office on listing — String() normalization",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 541,
+      "config": {
+        "officeIds": [ 98765 ]
+      },
+      "sellerMessage": "Office blocked."
+    },
+    {
+      "name": "x_list_mixed",
+      "synthetic": true,
+      "comment": "listRef with one exact and one regex item, resolved via resolveListRefs",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 542,
+      "config": {
+        "listRef": "golden_mixed",
+        "fields": [ "title" ]
+      },
+      "sellerMessage": "Mixed list reject."
+    },
+    {
+      "name": "x_country_fullname",
+      "synthetic": true,
+      "comment": "filter uses the full country name, listing uses the ISO code",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 543,
+      "config": {
+        "countryFilter": [ "Spain" ],
+        "conditions": [ { "field": "title", "operator": "contains", "value": "casa blanca golden" } ]
+      },
+      "sellerMessage": "Country fullname notice."
+    },
+    {
+      "name": "x_uk_rule",
+      "synthetic": true,
+      "comment": "filter GB, listing UK — normCountryCode alias",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 544,
+      "config": {
+        "countryFilter": [ "GB" ],
+        "conditions": [ { "field": "title", "operator": "contains", "value": "manor golden" } ]
+      },
+      "sellerMessage": "UK notice."
+    },
+    {
+      "name": "x_min_price",
+      "synthetic": true,
+      "comment": "no seed rule uses minPrice",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 545,
+      "config": {
+        "feedSourceFilter": [ "golden_price" ],
+        "minPrice": 1000000,
+        "conditions": [ { "field": "imageCount", "operator": ">", "value": 0 } ]
+      },
+      "sellerMessage": "Min price notice."
+    },
+    {
+      "name": "x_tie_a",
+      "synthetic": true,
+      "comment": "same priority as x_tie_b — stable sort must keep definition order",
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 546,
+      "config": {
+        "feedSourceFilter": [ "golden_tie" ],
+        "conditions": [ { "field": "imageCount", "operator": ">", "value": 0 } ]
+      },
+      "sellerMessage": "TIE:A"
+    },
+    {
+      "name": "x_tie_b",
+      "synthetic": true,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "notice",
+      "priority": 546,
+      "config": {
+        "feedSourceFilter": [ "golden_tie" ],
+        "conditions": [ { "field": "imageCount", "operator": ">", "value": 0 } ]
+      },
+      "sellerMessage": "TIE:B"
+    },
+    {
+      "name": "x_disabled",
+      "synthetic": true,
+      "enabled": false,
+      "category": "simple_code",
+      "tier": "auto",
+      "action": "reject",
+      "priority": 547,
+      "config": {
+        "conditions": [ { "field": "title", "operator": "contains", "value": "disabledcheck" } ]
+      },
+      "sellerMessage": "Should never fire."
+    }
+  ],
+  "fixtures": [
+    {
+      "label": "baseline_approve_es",
+      "note": "clean ES listing — nothing fires",
+      "listing": { "jeId": "g001", "title": "Elegant Villa in Marbella", "description": "A lovely property with sea views and a large garden in a prime location.", "country": "ES", "priceUsd": 950000, "imageCount": 10, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 75, "descriptionLength": 120, "realEstateType": "villa", "officeSubscription": "premium", "bedrooms": 4, "bathrooms": 3, "livingArea": 350, "pricePerSqm": 2714, "rental": false },
+      "expect": { "outcome": "approved" }
+    },
+    {
+      "label": "low_image_resolution_reject",
+      "note": "requireAll AND conditions + categoryFilter",
+      "listing": { "jeId": "g002", "title": "Elegant Villa in Marbella", "description": "A lovely property with sea views and a large garden in a prime location.", "country": "ES", "category": "real_estate", "priceUsd": 950000, "imageCount": 10, "avgImageWidth": 450, "avgImageHeight": 350, "lqi": 75, "descriptionLength": 120, "realEstateType": "villa", "officeSubscription": "premium", "bedrooms": 4, "bathrooms": 3, "rental": false },
+      "expect": { "outcome": "rejected", "mustMatch": [ "low_image_resolution" ] }
+    },
+    {
+      "label": "low_lqi_reject",
+      "listing": { "jeId": "g003", "title": "House in the suburbs", "description": "A standard family house close to schools and transport links here.", "country": "DE", "category": "real_estate", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 20, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "low_lqi" ] }
+    },
+    {
+      "label": "low_lqi_exclude_type_underscore",
+      "note": "excludeTypes 'Private Island' vs realEstateType 'private_island' (space/underscore tri-form)",
+      "listing": { "jeId": "g004", "title": "Remote island retreat", "description": "A secluded island property reachable by boat with pristine beaches around.", "country": "DE", "category": "real_estate", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 20, "descriptionLength": 100, "realEstateType": "private_island" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "low_lqi" ] }
+    },
+    {
+      "label": "few_pictures_boundary",
+      "listing": { "jeId": "g005", "title": "City apartment with balcony", "description": "Bright apartment near the central park with a generous balcony space.", "country": "DE", "priceUsd": 900000, "imageCount": 1, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "few_pictures" ] }
+    },
+    {
+      "label": "spain_fullname_price_reject",
+      "note": "listing country full name 'Spain' vs ISO filter [ES,...]",
+      "listing": { "jeId": "g006", "title": "Cosy townhouse near the beach", "description": "Walking distance to the promenade and all local amenities nearby today.", "country": "Spain", "priceUsd": 300000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "townhouse" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "price_too_low_re" ] }
+    },
+    {
+      "label": "algarve_region_price_reject",
+      "note": "region 'Algarve' normalizes to PT",
+      "listing": { "jeId": "g007", "title": "Coastal townhouse with terrace", "description": "South-facing terrace and a shared pool in a quiet residential street.", "country": "Algarve", "priceUsd": 200000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "townhouse" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "price_too_low_re" ] }
+    },
+    {
+      "label": "uk_alias_normalization",
+      "note": "listing 'UK' matches filter 'GB' via normCountryCode",
+      "listing": { "jeId": "g008", "title": "Historic Manor Golden Estate", "description": "A listed manor surrounded by mature parkland and formal walled gardens.", "country": "UK", "priceUsd": 2500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "house" },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_uk_rule" ] }
+    },
+    {
+      "label": "es_code_vs_fullname_filter",
+      "note": "listing ISO code 'ES' matches filter full name 'Spain'",
+      "listing": { "jeId": "g009", "title": "Stunning Casa Blanca Golden residence", "description": "An immaculate residence with panoramic views over the valley below it.", "country": "ES", "priceUsd": 1200000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "villa" },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_country_fullname" ] }
+    },
+    {
+      "label": "exclude_countries_us_fullname",
+      "note": "excludeCountries [US] suppresses incorrectly_priced for 'United States'",
+      "listing": { "jeId": "g010", "title": "Iconic Penthouse in Manhattan", "description": "Full-floor penthouse with private elevator entry and skyline views all.", "country": "United States", "priceUsd": 150000000, "imageCount": 9, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 80, "descriptionLength": 150, "realEstateType": "penthouse", "bedrooms": 4, "bathrooms": 3 },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "incorrectly_priced", "rational_check_price" ] }
+    },
+    {
+      "label": "incorrectly_priced_reject",
+      "listing": { "jeId": "g011", "title": "Iconic Penthouse in Milan", "description": "Full-floor penthouse with private elevator entry and skyline views all.", "country": "IT", "priceUsd": 150000000, "imageCount": 9, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 80, "descriptionLength": 150, "realEstateType": "penthouse", "bedrooms": 4, "bathrooms": 7 },
+      "expect": { "outcome": "rejected", "mustMatch": [ "incorrectly_priced" ] }
+    },
+    {
+      "label": "exclude_title_keyword_palace",
+      "note": "excludeTitleKeywords suppress incorrectly_priced and rational_check_price",
+      "listing": { "jeId": "g012", "title": "Magnificent Palace in Rome", "description": "A historic palace with frescoed ceilings and an internal courtyard too.", "country": "IT", "priceUsd": 150000000, "imageCount": 12, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 80, "descriptionLength": 150, "realEstateType": "penthouse", "bedrooms": 4, "bathrooms": 3 },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "incorrectly_priced", "rational_check_price" ] }
+    },
+    {
+      "label": "max_price_boundary_inclusive",
+      "note": "price == maxPrice passes the filter (strict >)",
+      "listing": { "jeId": "g013", "title": "Grand residence with many rooms", "description": "An expansive property featuring extensive accommodation over four floors.", "country": "DE", "priceUsd": 3000000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "villa", "bedrooms": 30, "bathrooms": 4 },
+      "expect": { "outcome": "rejected", "mustMatch": [ "rational_bedrooms_bathrooms" ] }
+    },
+    {
+      "label": "max_price_boundary_exceeded",
+      "listing": { "jeId": "g014", "title": "Grand residence with many rooms", "description": "An expansive property featuring extensive accommodation over four floors.", "country": "DE", "priceUsd": 3000001, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 150, "realEstateType": "villa", "bedrooms": 30, "bathrooms": 4 },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "rational_bedrooms_bathrooms" ] }
+    },
+    {
+      "label": "min_price_boundary_inclusive",
+      "note": "price == minPrice passes (strict <)",
+      "listing": { "jeId": "g015", "title": "Lakeside chalet retreat", "description": "Quiet chalet at the waterline with a private jetty and boathouse there.", "country": "DE", "feedSource": "golden_price", "priceUsd": 1000000, "imageCount": 5, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "chalet" },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_min_price" ] }
+    },
+    {
+      "label": "min_price_below",
+      "listing": { "jeId": "g016", "title": "Lakeside chalet retreat", "description": "Quiet chalet at the waterline with a private jetty and boathouse there.", "country": "DE", "feedSource": "golden_price", "priceUsd": 999999, "imageCount": 5, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "chalet" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "x_min_price" ] }
+    },
+    {
+      "label": "price_field_fallback",
+      "note": "priceUsd absent — priceUsd || price || 0 falls back to price",
+      "listing": { "jeId": "g017", "title": "Lakeside chalet retreat", "description": "Quiet chalet at the waterline with a private jetty and boathouse there.", "country": "DE", "feedSource": "golden_price", "price": 1500000, "imageCount": 5, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "chalet" },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_min_price" ] }
+    },
+    {
+      "label": "dubai_region_type_filter",
+      "note": "region 'Dubai' -> AE plus typeFilter exact ci match",
+      "listing": { "jeId": "g018", "title": "Marina view apartment", "description": "High-floor unit overlooking the marina with concierge services included.", "country": "Dubai", "priceUsd": 700000, "pricePerSqm": 800, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "dubai_price_sqm" ] }
+    },
+    {
+      "label": "rental_skips_nonrental_rule",
+      "note": "nonRentalOnly excludes rentals",
+      "listing": { "jeId": "g019", "title": "Apartment for seasonal stay", "description": "Fully furnished apartment available for long seasonal stays right now.", "country": "IT", "priceUsd": 600000, "pricePerSqm": 100, "rental": true, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "extremely_low_price_sqm" ] }
+    },
+    {
+      "label": "nonrental_low_ppsqm_reject",
+      "listing": { "jeId": "g020", "title": "Apartment in the old town", "description": "Characterful apartment on a cobbled lane near the cathedral square here.", "country": "IT", "priceUsd": 600000, "pricePerSqm": 100, "rental": false, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "extremely_low_price_sqm" ] }
+    },
+    {
+      "label": "netty_rentals_filters_only_dead",
+      "note": "netty_rentals has only filters (groupFilter+rentalOnly) — the filters-only branch means it can never match",
+      "listing": { "jeId": "g021", "title": "Rental flat by the river", "description": "Comfortable flat available immediately on a twelve month rental basis.", "country": "DE", "officeGroupName": "890", "rental": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "apartment" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "netty_rentals" ] }
+    },
+    {
+      "label": "cgg_group_few_images",
+      "note": "groupFilter + conditions",
+      "listing": { "jeId": "g022", "title": "Suburban family house", "description": "Detached house with a double garage and a landscaped rear garden space.", "country": "DE", "officeGroupName": "2771", "priceUsd": 900000, "imageCount": 2, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "cgg_2_images" ], "mustNotMatch": [ "scraping_bedrooms_too_big", "few_pictures" ] }
+    },
+    {
+      "label": "nystatemls_lqi_boundary",
+      "note": "lqi <= 45 inclusive boundary",
+      "listing": { "jeId": "g023", "title": "Upstate colonial house", "description": "Classic colonial with wraparound porch on a generous corner plot there.", "country": "US", "officeGroupName": "3167", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 45, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "nystatemls_lqi" ], "mustNotMatch": [ "nymls_images", "low_lqi" ] }
+    },
+    {
+      "label": "outdated_freemium_reject",
+      "note": "outdated:true filter + accountTypeFilter substring",
+      "listing": { "jeId": "g024", "title": "Townhouse on the hillside", "description": "Terraced hillside home with rooftop seating and distant sea glimpses.", "country": "DE", "officeSubscription": "freemium", "outdated": true, "priceUsd": 1500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "townhouse" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "outdated_freemium_under_2m" ], "mustNotMatch": [ "outdated_freemium_2m_5m", "outdated_paid_approve" ] }
+    },
+    {
+      "label": "outdated_paid_filters_only_dead",
+      "note": "outdated_paid_approve has only filters — filters-only branch, never matches; listing falls through to default approve",
+      "listing": { "jeId": "g025", "title": "Townhouse on the hillside", "description": "Terraced hillside home with rooftop seating and distant sea glimpses.", "country": "DE", "officeSubscription": "premium", "outdated": true, "priceUsd": 1500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "townhouse" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "outdated_paid_approve", "outdated_freemium_under_2m" ] }
+    },
+    {
+      "label": "viktor_approve_short_circuit",
+      "note": "auto+approve returns before the AI-trigger phase — sold_keywords never evaluates",
+      "listing": { "jeId": "g026", "title": "Charming Villa Sold", "description": "Bright family villa with a mature olive grove and original features.", "country": "ES", "viktorApprove": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustMatch": [ "viktor_approval" ], "mustNotMatch": [ "sold_keywords" ] }
+    },
+    {
+      "label": "viktor_reject",
+      "listing": { "jeId": "g027", "title": "Standard family home", "description": "Comfortable home with a practical layout and a sunny breakfast corner.", "country": "DE", "viktorReject": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "viktor_autoreject" ] }
+    },
+    {
+      "label": "reject_beats_manual_flag",
+      "note": "auto reject wins over a co-matching manual flag rule",
+      "listing": { "jeId": "g028", "title": "Standard family home", "description": "Comfortable home with a practical layout and a sunny breakfast corner.", "country": "DE", "viktorReject": true, "officeGroupName": "Sunset Realty Group", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "viktor_autoreject", "x_office_names" ] }
+    },
+    {
+      "label": "office_names_manual",
+      "listing": { "jeId": "g029", "title": "Standard family home", "description": "Comfortable home with a practical layout and a sunny breakfast corner.", "country": "DE", "officeGroupName": "Sunset Realty Group", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "manual", "mustMatch": [ "x_office_names" ] }
+    },
+    {
+      "label": "office_ids_reject",
+      "note": "numeric config id vs string listing office",
+      "listing": { "jeId": "g030", "title": "Standard family home", "description": "Comfortable home with a practical layout and a sunny breakfast corner.", "country": "DE", "office": "98765", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_office_ids" ] }
+    },
+    {
+      "label": "commercial_title_needs_llm",
+      "note": "listRef regex hit, excludeListRef misses",
+      "listing": { "jeId": "g031", "title": "Commercial Building in central Madrid", "description": "Prime city-center premises with high foot traffic and excellent access.", "country": "ES", "priceUsd": 2500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 80, "realEstateType": "other" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "commercial_properties_title", "commercial_properties_23" ] }
+    },
+    {
+      "label": "commercial_excluded_by_residential",
+      "note": "excludeListRef (residential keywords) rescues the listing",
+      "listing": { "jeId": "g032", "title": "Commercial Building with five bedrooms", "description": "Prime city-center premises with high foot traffic and excellent access.", "country": "ES", "priceUsd": 2500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 80, "realEstateType": "other" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "commercial_properties_title", "commercial_properties_23" ] }
+    },
+    {
+      "label": "sold_keyword_needs_llm",
+      "listing": { "jeId": "g033", "title": "Stunning Villa - SOLD", "description": "Beautiful coastal villa with ocean views and a heated infinity pool.", "country": "PT", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "sold_keywords" ] }
+    },
+    {
+      "label": "sold_furnished_excluded",
+      "note": "Sold_furnished whitelist suppresses the sold match",
+      "listing": { "jeId": "g034", "title": "Villa sold furnished with elegant interiors", "description": "Beautiful coastal villa with ocean views and a heated infinity pool.", "country": "PT", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "sold_keywords" ] }
+    },
+    {
+      "label": "bad_condition_needs_llm",
+      "listing": { "jeId": "g035", "title": "Townhouse to be restored in Umbria", "description": "Charming stone property in the countryside with original beamed rooms.", "country": "IT", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 90, "realEstateType": "townhouse" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "bad_condition_keywords" ] }
+    },
+    {
+      "label": "bad_condition_fancy_excluded",
+      "note": "RE_fancy_types exclude pattern in description rescues the listing",
+      "listing": { "jeId": "g036", "title": "Villa to be restored", "description": "Brand new kitchen installed last year with premium appliances included.", "country": "IT", "priceUsd": 800000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 90, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "bad_condition_keywords" ] }
+    },
+    {
+      "label": "or_conditions_high_price",
+      "note": "AND condition plus orConditions (one branch true)",
+      "listing": { "jeId": "g037", "title": "Exceptional Estate in Aspen", "description": "Mountain estate with panoramic terraces and a private spa level inside.", "country": "US", "priceUsd": 60000000, "imageCount": 10, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 40, "descriptionLength": 120, "realEstateType": "house" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "high_price_low_lqi" ] }
+    },
+    {
+      "label": "five_hundred_million_flag_llm",
+      "note": "former_manual manual/flag rule still routes through the LLM phase",
+      "listing": { "jeId": "g038", "title": "Mega Estate of the Coast", "description": "An extraordinary coastal compound with guest villas and staff quarters.", "country": "US", "priceUsd": 600000000, "imageCount": 10, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 80, "descriptionLength": 120, "realEstateType": "villa", "bedrooms": 12, "bathrooms": 12 },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "five_hundred_million_ads" ], "mustNotMatch": [ "high_price_low_lqi", "incorrectly_priced" ] }
+    },
+    {
+      "label": "gpt_spain_multi_llm",
+      "note": "three auto_ai gpt rules co-match in priority order",
+      "listing": { "jeId": "g039", "title": "Apartment in Sevilla centre", "description": "Renovation candidate apartment two streets from the river esplanade.", "country": "ES", "priceUsd": 2000000, "gptCondition": 1.5, "gptConclusion": 1.8, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "apartment" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "gpt_condition_auto_spain", "gpt_condition_manual_spain", "gpt_conclusion_spain" ], "mustNotMatch": [ "gpt_condition_auto_spain_low" ] }
+    },
+    {
+      "label": "cars_category_normalization_reject",
+      "note": "category 'Listing::Car' normalizes to 'cars'",
+      "listing": { "jeId": "g040", "title": "Classic Roadster", "description": "Restored classic roadster with matching numbers and full history file.", "country": "DE", "category": "Listing::Car", "price": 3000, "imageCount": 6, "officeSubscription": "premium", "descriptionLength": 80 },
+      "expect": { "outcome": "rejected", "mustMatch": [ "cars_low_price" ] }
+    },
+    {
+      "label": "cars_freemium_truck_llm",
+      "listing": { "jeId": "g041", "title": "2020 Ford F-150 Raptor Pickup", "description": "Powerful pickup with the performance package and tow assist included.", "country": "US", "category": "cars", "price": 60000, "year": 2020, "imageCount": 6, "officeSubscription": "freemium", "descriptionLength": 80 },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "cars_freemium_low_price", "cars_truck_models" ], "mustNotMatch": [ "cars_no_year", "cars_low_price", "cars_non_luxury_brand" ] }
+    },
+    {
+      "label": "ops_full_matrix",
+      "note": "operator matrix: in/not_in/contains/not_contains/matches/empty/is_true/is_false/eq(5.0)/neq/gte('50')/is_null/requireAll:false all fire; scalar-in, invalid regex, NaN-lt and not_empty stay silent",
+      "listing": { "jeId": "g042", "title": "Luxury Penthouse Duplex Unit", "description": "", "country": "DE", "feedSource": "golden_ops", "city": "Madrid", "rental": true, "outdated": false, "bedrooms": 5.0, "realEstateType": "villa", "lqi": 50, "priceUsd": 900000, "imageCount": 7 },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_op_in", "x_op_not_in", "x_op_contains", "x_op_not_contains", "x_op_matches", "x_op_empty", "x_op_is_true", "x_op_is_false", "x_op_eq_float", "x_op_neq", "x_op_gte_str", "x_op_is_null", "x_op_require_any" ], "mustNotMatch": [ "x_op_in_scalar", "x_op_matches_invalid", "x_op_lt_nan", "x_op_not_empty" ] }
+    },
+    {
+      "label": "ops_missing_fields",
+      "note": "missing fields only satisfy empty/is_null; not_in and is_false on missing fields are FALSE",
+      "listing": { "jeId": "g043", "title": "Cozy studio flat", "realEstateType": "apartment", "country": "DE", "feedSource": "golden_ops", "outdated": true, "rental": false, "year": 2024, "lqi": 60, "priceUsd": 900000, "imageCount": 7 },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_op_empty", "x_op_gte_str" ], "mustNotMatch": [ "x_op_not_in", "x_op_is_false", "x_op_is_null", "x_op_not_empty", "x_op_neq", "x_op_require_any" ] }
+    },
+    {
+      "label": "ops_feedsource_substring",
+      "note": "feedSourceFilter is a substring match; lqi 49.5 < '50'",
+      "listing": { "jeId": "g044", "title": "Quiet riverside home", "description": "A peaceful retreat with willow trees lining the private river bank.", "country": "DE", "feedSource": "the_golden_ops_feed_v2", "city": "Lisbon", "rental": false, "outdated": false, "realEstateType": "house", "lqi": 49.5, "priceUsd": 900000, "imageCount": 7, "descriptionLength": 60 },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_op_in", "x_op_not_in", "x_op_not_contains", "x_op_not_empty", "x_op_is_false", "x_op_neq", "x_op_is_null" ], "mustNotMatch": [ "x_op_gte_str", "x_op_contains", "x_op_empty", "x_op_is_true", "x_op_require_any" ] }
+    },
+    {
+      "label": "hv_scores_hit",
+      "note": "scoreThresholds: condition and conclusion both at/below thresholds",
+      "listing": { "jeId": "g045", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 2.0, "chatGptConclusion": "2.2", "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_hv_scores" ], "mustNotMatch": [ "x_hv_unident", "x_hv_watermark", "x_hv_wm_size" ] }
+    },
+    {
+      "label": "hv_scores_miss",
+      "listing": { "jeId": "g046", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 4.5, "chatGptConclusion": "4.0", "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "x_hv_scores" ] }
+    },
+    {
+      "label": "hv_watermark_keyword_reject",
+      "listing": { "jeId": "g047", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 4.5, "chatGptConclusion": "4.2", "chatGptWatermarkText": "VENDIDO - Inmobiliaria Sol", "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_hv_watermark" ], "mustNotMatch": [ "x_hv_scores" ] }
+    },
+    {
+      "label": "hv_watermark_size_manual",
+      "listing": { "jeId": "g048", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 4.5, "chatGptConclusion": "4.2", "chatGptWatermarkShare": 7.5, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "manual", "mustMatch": [ "x_hv_wm_size" ] }
+    },
+    {
+      "label": "hv_watermark_size_below",
+      "listing": { "jeId": "g049", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 4.5, "chatGptConclusion": "4.2", "chatGptWatermarkShare": 4, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "x_hv_wm_size" ] }
+    },
+    {
+      "label": "hv_watermark_size_default_threshold",
+      "note": "watermarkShareThreshold absent — || 3 default",
+      "listing": { "jeId": "g050", "title": "Harbour view apartment in Valletta", "description": "Apartment overlooking the grand harbour with limestone facade details.", "country": "MT", "priceUsd": 900000, "chatGptPropertyCondition": 4.5, "chatGptConclusion": "4.2", "chatGptWatermarkShare": 3.5, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "apartment" },
+      "expect": { "outcome": "manual", "mustMatch": [ "x_hv_wm_size_default" ] }
+    },
+    {
+      "label": "hv_unidentifiable_condition_zero",
+      "listing": { "jeId": "g051", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptPropertyCondition": 0, "chatGptConclusion": "4.0", "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_hv_unident" ], "mustNotMatch": [ "x_hv_scores" ] }
+    },
+    {
+      "label": "hv_skipped_without_vision_data",
+      "note": "hybrid_vision rules are skipped entirely when chatGptPropertyCondition is null",
+      "listing": { "jeId": "g052", "title": "Seaside Villa in Crete", "description": "Stone villa above a sheltered cove with terraced gardens to the shore.", "country": "GR", "priceUsd": 900000, "chatGptWatermarkShare": 9.0, "chatGptWatermarkText": "SOLD", "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 100, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "x_hv_watermark", "x_hv_wm_size" ] }
+    },
+    {
+      "label": "list_exact_item_substring",
+      "note": "exact list item matched case-insensitively as substring via textLists",
+      "listing": { "jeId": "g053", "title": "Welcome to FOOBAR ESTATE residence", "description": "A gated drive winds to the main house through ancient cork oak woods.", "country": "DE", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "house" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_list_mixed" ] }
+    },
+    {
+      "label": "list_regex_item",
+      "listing": { "jeId": "g054", "title": "Premium quxxx penthouse", "description": "A gated drive winds to the main house through ancient cork oak woods.", "country": "DE", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 100, "realEstateType": "penthouse" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "x_list_mixed" ] }
+    },
+    {
+      "label": "priority_tie_stable_order",
+      "note": "x_tie_a and x_tie_b share priority 546 — notice messages must join in definition order",
+      "listing": { "jeId": "g055", "title": "Tie test home", "description": "Plain test home used to verify stable ordering of equal priorities.", "country": "DE", "feedSource": "golden_tie", "priceUsd": 900000, "imageCount": 4, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "house" },
+      "expect": { "outcome": "notice", "mustMatch": [ "x_tie_a", "x_tie_b" ] }
+    },
+    {
+      "label": "disabled_rule_ignored",
+      "listing": { "jeId": "g056", "title": "This disabledcheck listing stays", "description": "Listing that would match a disabled rule and must remain untouched.", "country": "DE", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "house" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "x_disabled" ] }
+    },
+    {
+      "label": "near_empty_listing_approves",
+      "note": "missing fields never satisfy conditions (except empty/is_null which no auto rule uses bare)",
+      "listing": { "jeId": "g057", "title": "Plain residence" },
+      "expect": { "outcome": "approved" }
+    },
+    {
+      "label": "eq_case_insensitive_country",
+      "note": "country 'ru' (lowercase) matches eq 'RU'",
+      "listing": { "jeId": "g058", "title": "Moscow centre apartment", "description": "Apartment near the boulevard ring with classic herringbone parquet.", "country": "ru", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "russia_block" ] }
+    },
+    {
+      "label": "title_equals_other_placeholder",
+      "listing": { "jeId": "g059", "title": "Other", "description": "Placeholder description for an uncategorised property listing entry.", "country": "DE", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "other" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "title_equals_other" ] }
+    },
+    {
+      "label": "por_france_fullname",
+      "listing": { "jeId": "g060", "title": "Apartment in Paris", "description": "Haussmannian apartment with balcony views over the leafy avenue below.", "country": "France", "priceOnRequest": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "por_france" ], "mustNotMatch": [ "por_low_price" ] }
+    },
+    {
+      "label": "accuracy_category_disabled",
+      "note": "accuracy flags present but the accuracy category never evaluates (disabled 2026-03-17)",
+      "listing": { "jeId": "g061", "title": "Data quality test home", "description": "Listing carrying LAS accuracy flags that must be ignored entirely now.", "country": "DE", "officeSubscription": "freemium", "accuracyFlags": [ "AI_WRONG_CURRENCY", "AI_STALE_LISTING" ], "accuracyScore": 0.2, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "house" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "las_wrong_currency", "las_stale_listing", "las_score_critical" ] }
+    },
+    {
+      "label": "short_description_llm",
+      "listing": { "jeId": "g062", "title": "City apartment", "description": "Nice flat.", "country": "DE", "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 30, "realEstateType": "apartment" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "short_description" ] }
+    },
+    {
+      "label": "moderation_by_request_llm",
+      "note": "former_manual manual/flag rule sets needsLlm rather than going straight to the manual queue",
+      "listing": { "jeId": "g063", "title": "Flagged family home", "description": "Home flagged by the moderation team for an additional manual review.", "country": "DE", "manualReview": true, "viktorFlagged": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "house" },
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "moderation_by_request" ] }
+    },
+    {
+      "label": "por_price_zero_reject",
+      "note": "eq against boolean true and number 0",
+      "listing": { "jeId": "g064", "title": "Compact flat", "description": "Compact unit close to the metro line with shared rooftop and storage.", "country": "DE", "priceOnRequest": true, "price": 0, "livingArea": 45, "bedrooms": 1, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "apartment" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "por_price_zero" ] }
+    },
+    {
+      "label": "exclude_offices_number_coercion",
+      "note": "excludeOffices [118806] vs string office '118806' — Number() coercion",
+      "listing": { "jeId": "g065", "title": "Villa duplicate test", "description": "Villa listed twice by the same office to exercise duplicate handling.", "country": "ES", "office": "118806", "duplicatesOriginalListing": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "villa" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "duplicates_within_single_account_spain" ] }
+    },
+    {
+      "label": "duplicates_spain_reject",
+      "listing": { "jeId": "g066", "title": "Villa duplicate test", "description": "Villa listed twice by the same office to exercise duplicate handling.", "country": "ES", "office": "999", "duplicatesOriginalListing": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "villa" },
+      "expect": { "outcome": "rejected", "mustMatch": [ "duplicates_within_single_account_spain" ] }
+    }
+  ]
+}

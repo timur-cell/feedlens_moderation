@@ -1,4 +1,3 @@
-import { useQuery } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import {
   CheckCircle2,
@@ -17,7 +16,8 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
-import { api } from "../../convex/_generated/api";
+import { useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -355,8 +355,12 @@ function StackedBarChart({ data }: { data: Array<Record<string, any>> }) {
 // ─── Recent Activity ────────────────────────────────────────────
 
 function RecentActivity() {
-  const results = useQuery(api.moderation.getRecentResults, { limit: 10 });
-  const listings = useQuery(api.listings.listRecent, { limit: 50 });
+  const { data: results } = useApiQuery(apiClient.moderation.recent, {
+    limit: 10,
+  });
+  const { data: listings } = useApiQuery(apiClient.listings.recent, {
+    limit: 50,
+  });
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   if (!results || !listings) {
@@ -617,7 +621,7 @@ function getTimeAgo(timestamp: number): string {
 // ─── Rule Performance ───────────────────────────────────────────
 
 function RulePerformance() {
-  const rules = useQuery(api.rules.list);
+  const { data: rules } = useApiQuery(apiClient.rules.list);
 
   if (!rules) return null;
 
@@ -712,12 +716,12 @@ export default function DashboardPage() {
   const [selectedPreset, setSelectedPreset] = useState(5); // "All time" index
   const range = useMemo(() => getDateRange(DATE_PRESETS[selectedPreset].days), [selectedPreset]);
 
-  const dashData = useQuery(api.moderation.getDashboardStats, {
+  const { data: dashData } = useApiQuery(apiClient.dashboard.stats, {
     startDate: range.start,
     endDate: range.end,
   });
 
-  const exportData = useQuery(api.moderation.exportCSV, {
+  const { data: exportData } = useApiQuery(apiClient.dashboard.exportCsv, {
     startDate: range.start,
     endDate: range.end,
   });

@@ -1,6 +1,6 @@
-import { useQuery, useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { useState, useMemo } from "react";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import {
   FlaskConical,
   AlertTriangle,
@@ -671,17 +671,21 @@ function ResultsTable({
 // ─── Main Lab Page ───────────────────────────────────────────────
 
 export default function LabPage() {
-  const stats = useQuery(api.remediation.getStats);
-  const recentResults = useQuery(api.remediation.getRecent, {
+  const { data: stats } = useApiQuery(apiClient.remediation.stats);
+  const { data: recentResults } = useApiQuery(apiClient.remediation.recent, {
     limit: 100,
-    errorsOnly: false,
   });
-  const errorResults = useQuery(api.remediation.getRecent, {
-    limit: 100,
-    errorsOnly: true,
-  });
+  // The Rails API has no errorsOnly param — derive the error subset
+  // client-side (parity with the Convex hasFixableErrors filter).
+  const errorResults = useMemo(
+    () =>
+      recentResults
+        ? recentResults.filter((r: any) => r.hasFixableErrors)
+        : undefined,
+    [recentResults],
+  );
 
-  const batchScan = useAction(api.remediation.batchScan);
+  const [batchScan] = useApiMutation(apiClient.remediation.batchScan);
   const [scanning, setScanning] = useState(false);
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("overview");

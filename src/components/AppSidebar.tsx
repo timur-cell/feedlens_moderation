@@ -1,5 +1,3 @@
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
 import {
   LayoutDashboard,
   LogOut,
@@ -18,8 +16,10 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { api } from "../../convex/_generated/api";
+import { useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import {
   DropdownMenu,
@@ -95,7 +95,9 @@ function NavLink({
 
 function SidebarNav() {
   const location = useLocation();
-  const stats = useQuery(api.listings.getStats);
+  const { data: stats } = useApiQuery(apiClient.listings.stats, undefined, {
+    pollMs: 7000,
+  });
   const manualCount = stats?.manual || 0;
 
   return (
@@ -160,8 +162,7 @@ function SidebarNav() {
 }
 
 function SidebarUserMenu() {
-  const user = useQuery(api.auth.currentUser);
-  const { signOut } = useAuthActions();
+  const { user, signOut } = useAuth();
   const { theme, toggleTheme, switchable } = useTheme();
   const { setOpenMobile } = useSidebar();
   const location = useLocation();
