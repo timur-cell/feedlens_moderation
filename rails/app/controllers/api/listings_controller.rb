@@ -49,8 +49,14 @@ module Api
     # POST /api/listings/:id/moderate — runs the rule engine
     def moderate
       listing = Listing.find(params[:id])
-      result = Moderation::Runner.call(listing, moderator: current_moderator)
-      render json: result
+
+      if ActiveModel::Type::Boolean.new.cast(params[:async])
+        ModerateListingJob.perform_later(listing.id, current_moderator&.id)
+        render json: { status: "queued", listingId: listing.id }, status: :accepted
+      else
+        result = Moderation::Runner.call(listing, moderator: current_moderator)
+        render json: result
+      end
     end
   end
 end
