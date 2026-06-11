@@ -58,7 +58,9 @@ SECRET_KEY_BASE=$(openssl rand -hex 64)
 DATABASE_PASSWORD=$(openssl rand -hex 16)
 ADMIN_EMAIL=admin@feedlens.local
 ADMIN_PASSWORD=$ADMIN_PASSWORD
-LAS_PUSH_API_KEY=$(openssl rand -hex 24)
+# LAS integration disabled for now: the /api/push-flagged endpoint rejects
+# all requests until LAS_PUSH_API_KEY is set here.
+LAS_PUSH_API_KEY=
 APP_BIND=127.0.0.1
 APP_PORT=$APP_PORT
 IMPLIO_STUB=true
@@ -87,7 +89,6 @@ done
 
 ADMIN_EMAIL=$(grep '^ADMIN_EMAIL=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASSWORD=$(grep '^ADMIN_PASSWORD=' "$ENV_FILE" | cut -d= -f2)
-LAS_KEY=$(grep '^LAS_PUSH_API_KEY=' "$ENV_FILE" | cut -d= -f2)
 
 echo
 echo "──────────────────────────────────────────────────────────────"
@@ -101,7 +102,6 @@ fi
 echo
 echo "  Login:              $ADMIN_EMAIL"
 echo "  Password:           $ADMIN_PASSWORD"
-echo "  LAS push key:       $LAS_KEY"
 echo "  Config:             $ENV_FILE   (chmod 600)"
 echo
 echo "  Next steps:"
