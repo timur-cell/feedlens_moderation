@@ -56,19 +56,6 @@ module Api
       render json: { success: true }
     end
 
-    # POST /api/moderation-results/:id/override-with-implio
-    def override_with_implio
-      result = ModerationResult.find(params[:id])
-      apply_override!(result)
-
-      implio = Integrations::ImplioClient.submit_result(result)
-      implio = (implio || {}).symbolize_keys
-
-      payload = { success: true, implioSubmitted: implio[:success] == true }
-      payload[:implioError] = implio[:error] if implio[:error].present?
-      render json: payload
-    end
-
     private
 
     # Mirrors moderation.overrideDecision: stores the original outcome,

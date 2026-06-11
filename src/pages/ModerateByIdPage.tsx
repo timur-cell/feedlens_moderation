@@ -183,9 +183,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
     { jeId: result.jeId },
     { enabled: !!result.jeId && result.status === "success" },
   );
-  const [overrideWithImplio] = useApiMutation(
-    apiClient.moderation.overrideWithImplio,
-  );
+  const [overrideDecision] = useApiMutation(apiClient.moderation.override);
   const [unlockListing] = useApiMutation(apiClient.listings.unlock);
   const { data: templates } = useApiQuery(apiClient.messages.list);
 
@@ -229,7 +227,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
     setActionLoading(true);
     try {
       // The override is attributed to the session moderator on the Rails side.
-      await overrideWithImplio({
+      await overrideDecision({
         resultId: dbResult._id,
         newOutcome: action,
         reason: reason || undefined,
@@ -237,7 +235,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
       });
       setOverrideOutcome(action);
-      toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"} — synced to Implio`);
+      toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"}`);
       closeActionDialog();
     } catch (err) {
       console.error("Override failed:", err);

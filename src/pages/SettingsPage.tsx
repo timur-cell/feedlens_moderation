@@ -806,7 +806,7 @@ function AlertsSection() {
               </div>
               <div>
                 <Label className="font-medium">API Errors</Label>
-                <p className="text-sm text-muted-foreground">Alert on external API failures (Implio, JE API)</p>
+                <p className="text-sm text-muted-foreground">Alert on external API failures (Claude, JE API)</p>
               </div>
             </div>
             <Switch checked={apiErrors} onCheckedChange={(v) => { setApiErrors(v); markDirty(); }} />

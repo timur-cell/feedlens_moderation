@@ -1,6 +1,6 @@
 module Api
   # Image recognition results/analyses (convex/imageRecognition.ts) and the
-  # vision analysis + Implio submission actions, delegated to service shells.
+  # vision analysis actions, delegated to service shells.
   class ImageRecognitionController < BaseController
     # GET /api/image-recognition/results
     def results
@@ -51,16 +51,6 @@ module Api
     # POST /api/image-recognition/analyze-listing-url
     def analyze_listing_url
       render json: Ai::VisionAnalyzer.analyze_listing_url(url: params[:url].to_s)
-    end
-
-    # POST /api/image-recognition/submit-implio
-    def submit_implio
-      result = Integrations::ImplioClient.submit_decision(
-        je_id: params[:jeId].to_s,
-        outcome: params[:outcome].to_s,
-        message: params[:message].presence
-      )
-      render json: result
     end
   end
 end

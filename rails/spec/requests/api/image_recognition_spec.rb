@@ -9,7 +9,6 @@ RSpec.describe "Api image recognition", type: :request do
   include_examples "requires moderator", :delete, -> { "/api/image-recognition/analyses" }
   include_examples "requires moderator", :post, -> { "/api/image-recognition/analyze" }
   include_examples "requires moderator", :post, -> { "/api/image-recognition/analyze-listing-url" }
-  include_examples "requires moderator", :post, -> { "/api/image-recognition/submit-implio" }
 
   describe "GET /api/image-recognition/results" do
     it "lists saved results newest first" do
@@ -96,20 +95,6 @@ RSpec.describe "Api image recognition", type: :request do
       post "/api/image-recognition/analyze-listing-url",
            params: { url: "https://www.jamesedition.com/real_estate/x/-12345678" }, as: :json
       expect(json["analyzedImages"]).to eq(3)
-    end
-  end
-
-  describe "POST /api/image-recognition/submit-implio" do
-    it "delegates to the Implio client" do
-      sign_in_as(create(:moderator))
-      payload = { success: true, action: "approve", jeId: "12345678" }
-      expect(Integrations::ImplioClient).to receive(:submit_decision)
-        .with(je_id: "12345678", outcome: "approved", message: "ok")
-        .and_return(payload)
-
-      post "/api/image-recognition/submit-implio",
-           params: { jeId: "12345678", outcome: "approved", message: "ok" }, as: :json
-      expect(json["success"]).to be(true)
     end
   end
 end

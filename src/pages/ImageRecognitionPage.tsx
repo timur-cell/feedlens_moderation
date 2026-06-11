@@ -117,9 +117,6 @@ function ListingUrlAnalysis() {
   const [analyzeByUrl] = useApiMutation(
     apiClient.imageRecognition.analyzeListingUrl,
   );
-  const [submitToImplio] = useApiMutation(
-    apiClient.imageRecognition.submitImplio,
-  );
   const { data: listingAnalysesData } = useApiQuery(
     apiClient.imageRecognition.listAnalyses,
   );
@@ -136,27 +133,6 @@ function ListingUrlAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAllImages, setShowAllImages] = useState<Record<string, boolean>>({});
-  const [submittingImplio, setSubmittingImplio] = useState<Record<string, string>>({});
-  const [rejectReasonId, setRejectReasonId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-
-  const handleImplioSubmit = async (analysis: any, action: "approve" | "reject", reason?: string) => {
-    const analysisId = analysis._id;
-    setSubmittingImplio(prev => ({ ...prev, [analysisId]: action }));
-    try {
-      await submitToImplio({
-        jeId: String(analysis.jeId),
-        outcome: action === "approve" ? "approved" : "rejected",
-        message: reason,
-      });
-    } catch (e: any) {
-      alert(`Failed to submit to Implio: ${e.message}`);
-    } finally {
-      setSubmittingImplio(prev => { const next = { ...prev }; delete next[analysisId]; return next; });
-      setRejectReasonId(null);
-      setRejectReason("");
-    }
-  };
 
   const handleAnalyze = async () => {
     if (!urlInput.trim()) {
@@ -335,52 +311,6 @@ function ListingUrlAnalysis() {
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          {/* Implio status badge */}
-                          {analysis.implioStatus === "approved" && (
-                            <Badge className="bg-green-600 text-white text-xs">✓ Approved in Implio</Badge>
-                          )}
-                          {analysis.implioStatus === "rejected" && (
-                            <Badge variant="destructive" className="text-xs">✗ Rejected in Implio</Badge>
-                          )}
-
-                          {/* Approve/Reject buttons (only if not yet submitted) */}
-                          {!analysis.implioStatus && (
-                            <>
-                              <Button
-                                variant="outline" size="sm"
-                                className="h-7 px-2.5 text-green-700 border-green-300 hover:bg-green-50 hover:border-green-500"
-                                disabled={!!submittingImplio[analysis._id]}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Approve listing #${analysis.jeId} in Implio?`)) {
-                                    handleImplioSubmit(analysis, "approve");
-                                  }
-                                }}
-                              >
-                                {submittingImplio[analysis._id] === "approve" ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve</>
-                                )}
-                              </Button>
-                              <Button
-                                variant="outline" size="sm"
-                                className="h-7 px-2.5 text-red-700 border-red-300 hover:bg-red-50 hover:border-red-500"
-                                disabled={!!submittingImplio[analysis._id]}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRejectReasonId(rejectReasonId === analysis._id ? null : analysis._id);
-                                }}
-                              >
-                                {submittingImplio[analysis._id] === "reject" ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <><X className="h-3.5 w-3.5 mr-1" /> Reject</>
-                                )}
-                              </Button>
-                            </>
-                          )}
-
                           {analysis.listingUrl && (
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7"
@@ -400,39 +330,6 @@ function ListingUrlAnalysis() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Reject Reason Input */}
-                  {rejectReasonId === analysis._id && (
-                    <div className="px-4 py-3 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-900 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                      <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                      <Input
-                        placeholder="Rejection reason (optional, sent to Implio)..."
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        className="flex-1 border-red-200 dark:border-red-800 bg-white dark:bg-gray-900"
-                        onKeyDown={(e) => e.key === "Enter" && handleImplioSubmit(analysis, "reject", rejectReason || undefined)}
-                        autoFocus
-                      />
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleImplioSubmit(analysis, "reject", rejectReason || undefined)}
-                        disabled={!!submittingImplio[analysis._id]}
-                      >
-                        {submittingImplio[analysis._id] === "reject" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                        ) : null}
-                        Confirm Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { setRejectReasonId(null); setRejectReason(""); }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
 
                   {/* Expanded Detail View */}
                   {isExpanded && (

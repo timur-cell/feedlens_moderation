@@ -1,8 +1,9 @@
 module Moderation
   # Orchestrates a full moderation run for a listing: AI parameter scan,
   # rule engine, on-demand vision for auto_ai matches, LLM verification,
-  # persistence, rule stats and Implio submission. Port of the
-  # moderateListing action in convex/moderation.ts.
+  # persistence and rule stats. Port of the moderateListing action in
+  # convex/moderation.ts (the Implio submit-back step was removed — this
+  # system replaces Implio).
   class Runner
     DEFAULT_LLM_MODEL = "claude-haiku-4-5-20251001".freeze
     MAX_VISION_IMAGES = 10
@@ -112,13 +113,6 @@ module Moderation
           )
           listing.update!(moderation_status: outcome)
           update_rule_stats(camel_matches)
-        end
-
-        # 7. Implio submission — stub-aware, never blocks the moderation run
-        begin
-          Integrations::ImplioClient.submit_result(moderation_result)
-        rescue StandardError => e
-          Rails.logger.error("Implio submission failed for listing #{listing.je_id}: #{e.message}")
         end
 
         {

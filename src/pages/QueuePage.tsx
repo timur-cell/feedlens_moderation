@@ -472,9 +472,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
     listingId: listing._id,
   });
   const { data: templates } = useApiQuery(apiClient.messages.list);
-  const [overrideWithImplio] = useApiMutation(
-    apiClient.moderation.overrideWithImplio,
-  );
+  const [overrideDecision] = useApiMutation(apiClient.moderation.override);
 
   const result = results?.[0];
   const ruleMatches = result?.ruleMatches || [];
@@ -507,9 +505,8 @@ function ListingCard({ listing }: { listing: QueueListing }) {
     const lockForever = opts?.permanent ?? permanent;
     setActionLoading(true);
     try {
-      // Use overrideWithImplio that also submits to Implio; the override is
-      // attributed to the session moderator on the Rails side.
-      await overrideWithImplio({
+      // The override is attributed to the session moderator on the Rails side.
+      await overrideDecision({
         resultId: result._id,
         newOutcome: action,
         reason: reason || undefined,
@@ -518,7 +515,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
         permanent: lockForever || undefined,
       });
       toast.success(
-        `Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"}${lockForever ? " permanently (locked)" : ""} — synced to Implio`,
+        `Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"}${lockForever ? " permanently (locked)" : ""}`,
       );
       closeActionDialog();
     } catch (err) {
