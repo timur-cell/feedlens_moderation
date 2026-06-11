@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FeedLens Moderation — Architecture</title>
+<style>
+  :root {
+    --ink: #1e293b;
+    --ink-strong: #0f172a;
+    --muted: #64748b;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --line-soft: #f1f5f9;
+    --bg: #fcfcfd;
+    --card: #ffffff;
+    --accent: #4338ca;
+    --accent-soft: #eef2ff;
+    --accent-line: #c7d2fe;
+    --good: #047857;
+    --good-soft: #ecfdf5;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --bad: #b91c1c;
+    --bad-soft: #fef2f2;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.65;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(252,252,253,.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; gap: 4px;
+    height: 52px; overflow-x: auto; white-space: nowrap;
+  }
+  .nav-brand {
+    font-weight: 700; color: var(--ink-strong); font-size: 14px;
+    margin-right: 14px; letter-spacing: -.01em; flex: none;
+  }
+  .nav-brand .dot { color: var(--accent); }
+  nav a.navlink {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500;
+    padding: 5px 10px; border-radius: 6px; flex: none;
+  }
+  nav a.navlink:hover { color: var(--ink-strong); background: var(--line-soft); }
+  nav a.navlink.active { color: var(--accent); background: var(--accent-soft); }
+  /* ---------- layout ---------- */
+  main { max-width: 1100px; margin: 0 auto; padding: 0 24px 96px; }
+  header.hero { padding: 56px 0 8px; }
+  h1 {
+    font-size: 34px; line-height: 1.15; letter-spacing: -.02em;
+    color: var(--ink-strong); margin: 0 0 14px; font-weight: 750;
+  }
+  .pitch { font-size: 17px; color: #475569; max-width: 56em; margin: 0 0 22px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chip {
+    font-size: 12.5px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--accent-line);
+    padding: 3px 11px; border-radius: 999px;
+  }
+  .chip.neutral { color: #475569; background: var(--line-soft); border-color: var(--line); }
+  section { padding-top: 36px; }
+  h2 {
+    font-size: 24px; letter-spacing: -.015em; color: var(--ink-strong);
+    margin: 24px 0 6px; font-weight: 700;
+    padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  h2 .secno { color: var(--faint); font-weight: 600; margin-right: 8px; font-size: 18px; }
+  h3 { font-size: 17px; color: var(--ink-strong); margin: 28px 0 6px; font-weight: 650; }
+  p { margin: 10px 0; }
+  .lead { color: #475569; max-width: 60em; }
+  code, .mono {
+    font-family: var(--mono); font-size: .87em;
+    background: var(--line-soft); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px; color: #334155;
+    overflow-wrap: anywhere;
+  }
+  pre {
+    font-family: var(--mono); font-size: 13px; line-height: 1.6;
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; color: #334155;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* ---------- tables ---------- */
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 12px; border: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--line-soft); color: #475569; font-weight: 650; font-size: 12.5px; letter-spacing: .02em; }
+  td code { white-space: nowrap; }
+  td.wrapcode code { white-space: normal; }
+  tr.group td {
+    background: var(--accent-soft); color: var(--accent); font-weight: 650;
+    font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase;
+  }
+  /* ---------- figures & callouts ---------- */
+  figure { margin: 22px 0; }
+  figure svg { display: block; width: 100%; height: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .callout {
+    border: 1px solid var(--accent-line); background: var(--accent-soft);
+    border-radius: 10px; padding: 12px 16px; margin: 16px 0; font-size: 14px;
+  }
+  .callout.warn { border-color: #fde68a; background: var(--warn-soft); }
+  .callout b:first-child { color: var(--accent); }
+  .callout.warn b:first-child { color: var(--warn); }
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+  @media (max-width: 760px) { .cols2 { grid-template-columns: 1fr; } }
+  ul, ol { padding-left: 24px; margin: 10px 0; }
+  li { margin: 5px 0; }
+  li::marker { color: var(--faint); }
+  .pillrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .pillrow code { background: #fff; }
+  footer.colophon {
+    margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  /* ---------- svg text ---------- */
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  svg .t-title { font-size: 12.5px; font-weight: 650; fill: #0f172a; }
+  svg .t-sub { font-size: 10.5px; fill: #64748b; }
+  svg .t-label { font-size: 10px; fill: #64748b; }
+  svg .t-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; fill: #475569; }
+  svg .t-head { font-size: 11.5px; font-weight: 650; fill: #3730a3; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="nav-brand">FeedLens<span class="dot">·</span>Architecture</span>
+    <a class="navlink" href="#overview">Overview</a>
+    <a class="navlink" href="#pipeline">Pipeline</a>
+    <a class="navlink" href="#engine">Rule Engine</a>
+    <a class="navlink" href="#data">Data Model</a>
+    <a class="navlink" href="#api">REST API</a>
+    <a class="navlink" href="#frontend">Frontend</a>
+    <a class="navlink" href="#ops">Deployment</a>
+    <a class="navlink" href="#testing">Testing</a>
+    <a class="navlink" href="#map">Repo Map</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ================================================================ 1. HEADER -->
+<header class="hero" id="top">
+  <h1>FeedLens Moderation — Architecture</h1>
+  <p class="pitch">
+    FeedLens is JamesEdition's internal listing-moderation tool. Listings arrive from the LAS
+    pipeline (webhook push) or are fetched on demand from the JE mobile API, then flow through a
+    deterministic rule engine augmented with optional AI — Claude vision on listing images, an AI
+    parameter scan, and LLM verification of borderline matches. Decisions are persisted, optionally
+    forwarded to Implio (the third-party moderation platform), and surfaced in a React SPA where
+    moderators work the manual queue, override outcomes, and manage rules, keyword lists, message
+    templates and team accounts. Originally built on Convex/TypeScript (frozen in
+    <code>convex/</code>, branch <code>typescript-v1</code>), the backend was fully rewritten to
+    Rails 8 + PostgreSQL with the SPA kept intact — engine parity is proven by golden fixtures
+    generated by executing the original TypeScript evaluators.
+  </p>
+  <div class="chips">
+    <span class="chip">Rails 8.1</span>
+    <span class="chip">PostgreSQL 16</span>
+    <span class="chip">React 19 SPA</span>
+    <span class="chip neutral">14 tables</span>
+    <span class="chip neutral">82 prod rules</span>
+    <span class="chip neutral">586 specs green</span>
+    <span class="chip neutral">e2e 23/23</span>
+  </div>
+</header>
+
+<!-- ================================================================ 2. SYSTEM OVERVIEW -->
+<section id="overview">
+  <h2><span class="secno">1</span>System overview</h2>
+  <p class="lead">
+    Everything runs as a five-service Docker Compose stack. The browser talks to nginx (which
+    serves the SPA build and proxies <code>/api</code> and <code>/image-proxy</code> to Rails); in
+    production Caddy fronts the stack with automatic Let's Encrypt TLS. Rails (Puma behind
+    Thruster) and the Solid Queue worker share one PostgreSQL instance holding the app database
+    and a separate queue database.
+  </p>
+
+  <figure>
+  <svg viewBox="0 0 1060 660" role="img" aria-label="System overview diagram">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+      </marker>
+      <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/>
+      </marker>
+    </defs>
+
+    <!-- compose group -->
+    <rect x="215" y="16" width="525" height="628" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="6 5"/>
+    <text x="232" y="638" class="t-label" font-style="italic">docker compose — services: db · web · jobs · frontend · caddy (prod overlay)</text>
+
+    <!-- browser -->
+    <rect x="16" y="250" width="160" height="96" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="96" y="278" text-anchor="middle" class="t-title">Browser</text>
+    <text x="96" y="296" text-anchor="middle" class="t-sub">React 19 SPA</text>
+    <text x="96" y="312" text-anchor="middle" class="t-sub">moderators (Devise session)</text>
+
+    <!-- caddy -->
+    <rect x="245" y="46" width="200" height="86" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="345" y="72" text-anchor="middle" class="t-title">caddy — TLS :80/:443</text>
+    <text x="345" y="90" text-anchor="middle" class="t-sub">Let's Encrypt for $DOMAIN</text>
+    <text x="345" y="106" text-anchor="middle" class="t-sub">prod overlay only</text>
+
+    <!-- frontend nginx -->
+    <rect x="245" y="250" width="200" height="110" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="345" y="276" text-anchor="middle" class="t-title">frontend — nginx :80</text>
+    <text x="345" y="294" text-anchor="middle" class="t-sub">serves SPA build (dist/)</text>
+    <text x="345" y="310" text-anchor="middle" class="t-sub">proxies /api · /image-proxy · /up</text>
+    <text x="345" y="326" text-anchor="middle" class="t-sub">SPA fallback to index.html</text>
+
+    <!-- web rails -->
+    <rect x="505" y="210" width="205" height="120" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="607" y="236" text-anchor="middle" class="t-title">web — Rails 8.1 API</text>
+    <text x="607" y="254" text-anchor="middle" class="t-sub">Puma behind Thruster (:80)</text>
+    <text x="607" y="270" text-anchor="middle" class="t-sub">rule engine · AI services</text>
+    <text x="607" y="286" text-anchor="middle" class="t-sub">Devise sessions + CSRF</text>
+    <text x="607" y="302" text-anchor="middle" class="t-mono">rails/app/…</text>
+
+    <!-- jobs -->
+    <rect x="505" y="380" width="205" height="88" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="607" y="406" text-anchor="middle" class="t-title">jobs — Solid Queue worker</text>
+    <text x="607" y="424" text-anchor="middle" class="t-sub">same image, runs ./bin/jobs</text>
+    <text x="607" y="440" text-anchor="middle" class="t-sub">EnrichListingJob · vision · scans</text>
+
+    <!-- db -->
+    <rect x="505" y="512" width="205" height="100" rx="10" fill="#ffffff" stroke="#94a3b8"/>
+    <text x="607" y="538" text-anchor="middle" class="t-title">db — PostgreSQL 16</text>
+    <text x="607" y="557" text-anchor="middle" class="t-mono">feedlens_production</text>
+    <text x="607" y="573" text-anchor="middle" class="t-mono">feedlens_production_queue</text>
+    <text x="607" y="592" text-anchor="middle" class="t-sub">app DB + Solid Queue DB</text>
+
+    <!-- externals -->
+    <rect x="790" y="36" width="250" height="76" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="60" text-anchor="middle" class="t-title">LAS pipeline</text>
+    <text x="915" y="78" text-anchor="middle" class="t-mono">POST /api/push-flagged</text>
+    <text x="915" y="94" text-anchor="middle" class="t-sub">X-Api-Key (constant-time check)</text>
+
+    <rect x="790" y="130" width="250" height="72" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="154" text-anchor="middle" class="t-title">JE Mobile API</text>
+    <text x="915" y="171" text-anchor="middle" class="t-mono">www.jamesedition.com</text>
+    <text x="915" y="187" text-anchor="middle" class="t-sub">mobile API → search API → HTML scrape</text>
+
+    <rect x="790" y="220" width="250" height="64" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="244" text-anchor="middle" class="t-title">img.jamesedition.com</text>
+    <text x="915" y="261" text-anchor="middle" class="t-sub">listing photos, fetched server-side</text>
+    <text x="915" y="276" text-anchor="middle" class="t-sub">via GET /image-proxy (hostname allowlist)</text>
+
+    <rect x="790" y="302" width="250" height="72" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="326" text-anchor="middle" class="t-title">api.anthropic.com</text>
+    <text x="915" y="343" text-anchor="middle" class="t-sub">Claude vision · param scan</text>
+    <text x="915" y="359" text-anchor="middle" class="t-sub">LLM verification · rule/list suggesters</text>
+
+    <rect x="790" y="392" width="250" height="58" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="416" text-anchor="middle" class="t-title">api.openai.com</text>
+    <text x="915" y="433" text-anchor="middle" class="t-sub">GPT-4o fallback vision provider</text>
+
+    <rect x="790" y="468" width="250" height="72" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="915" y="492" text-anchor="middle" class="t-title">api.implio.com</text>
+    <text x="915" y="509" text-anchor="middle" class="t-sub">decision forwarding (/v1/ads)</text>
+    <text x="915" y="525" text-anchor="middle" class="t-sub">IMPLIO_STUB default ON → logs only</text>
+
+    <!-- arrows -->
+    <!-- browser -> caddy (https, prod) -->
+    <polyline points="96,250 96,89 237,89" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="106" y="160" class="t-label">HTTPS :443 (prod)</text>
+    <!-- browser -> frontend (dev) -->
+    <line x1="176" y1="305" x2="237" y2="305" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="180" y="297" class="t-label">:8080 (dev)</text>
+    <!-- caddy -> frontend -->
+    <line x1="345" y1="132" x2="345" y2="242" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="353" y="192" class="t-label">reverse_proxy frontend:80</text>
+    <!-- frontend -> web -->
+    <line x1="445" y1="290" x2="497" y2="278" stroke="#4338ca" stroke-width="1.6" marker-end="url(#arrA)"/>
+    <text x="438" y="266" class="t-label">/api · /image-proxy</text>
+    <!-- web -> db (elbow on left) -->
+    <polyline points="505,316 478,316 478,562 497,562" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="420" y="450" class="t-label" transform="rotate(-90 420 450)">SQL — app DB</text>
+    <!-- web -> jobs (dashed, via queue) -->
+    <line x1="565" y1="330" x2="565" y2="372" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+    <text x="448" y="358" class="t-label">enqueue (queue DB)</text>
+    <!-- jobs -> db -->
+    <line x1="640" y1="468" x2="640" y2="504" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <!-- LAS -> web (inbound) -->
+    <polyline points="790,76 660,76 660,202" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="668" y="120" class="t-label">push flagged listings</text>
+    <!-- web -> JE -->
+    <line x1="710" y1="228" x2="782" y2="172" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+    <!-- web -> img -->
+    <line x1="710" y1="252" x2="782" y2="252" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+    <!-- web -> anthropic -->
+    <line x1="710" y1="282" x2="782" y2="330" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+    <!-- web -> openai -->
+    <line x1="710" y1="302" x2="782" y2="414" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+    <!-- web -> implio -->
+    <line x1="710" y1="322" x2="782" y2="496" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+    <!-- jobs -> JE/AI note -->
+    <line x1="710" y1="420" x2="782" y2="437" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+    <text x="716" y="412" class="t-label">jobs call JE + AI too</text>
+  </svg>
+  <figcaption>
+    Figure 1 — Runtime topology. Solid arrows are synchronous HTTP/SQL; dashed arrows are async
+    (jobs picked up from the Solid Queue database). The dashed outline is the Compose service
+    boundary (<code>docker-compose.yml</code> + overlays).
+  </figcaption>
+  </figure>
+
+  <ul>
+    <li><b>Same-origin by design</b> — nginx proxies <code>/api</code> to Rails so Devise session
+      cookies and the CSRF token never cross origins. There is no CORS for the SPA.</li>
+    <li><b>Two unauthenticated entry points</b> only: <code>POST /api/push-flagged</code>
+      (API-key auth for LAS) and <code>GET /image-proxy</code> (strict
+      <code>jamesedition.com</code> hostname allowlist, https-only, parsed-hostname check to
+      prevent SSRF).</li>
+    <li><b>AI is optional</b> — without <code>ANTHROPIC_API_KEY</code> the engine still runs;
+      AI-trigger matches simply route to the manual queue. Implio submission is stubbed
+      (payload logged, no HTTP) unless <code>IMPLIO_STUB=false</code>.</li>
+  </ul>
+</section>
+
+<!-- ================================================================ 3. PIPELINE -->
+<section id="pipeline">
+  <h2><span class="secno">2</span>The moderation pipeline</h2>
+  <p class="lead">
+    Source of truth: <code>rails/app/services/moderation/runner.rb</code> (the orchestrator, a
+    port of the Convex <code>moderateListing</code> action) and
+    <code>rails/app/services/listings/fetch_and_moderate.rb</code> (the fetch-then-moderate
+    flow behind <i>Moderate by URL</i>).
+  </p>
+
+  <figure>
+  <svg viewBox="0 0 1040 330" role="img" aria-label="Moderation pipeline flow">
+    <defs>
+      <marker id="parr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/>
+      </marker>
+    </defs>
+    <!-- row 1 -->
+    <rect x="20" y="40" width="190" height="92" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="115" y="64" text-anchor="middle" class="t-title">0 · AI param scan</text>
+    <text x="115" y="82" text-anchor="middle" class="t-sub">deterministic checks + Claude</text>
+    <text x="115" y="97" text-anchor="middle" class="t-sub">verdict; cached per listing;</text>
+    <text x="115" y="112" text-anchor="middle" class="t-sub">non-blocking on failure</text>
+
+    <rect x="255" y="40" width="190" height="92" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="350" y="64" text-anchor="middle" class="t-title">1 · Load config</text>
+    <text x="350" y="82" text-anchor="middle" class="t-sub">enabled rules (priority asc)</text>
+    <text x="350" y="97" text-anchor="middle" class="t-sub">+ lists (listRef resolution)</text>
+    <text x="350" y="112" text-anchor="middle" class="t-sub">+ settings thresholds</text>
+
+    <rect x="490" y="40" width="190" height="92" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="585" y="64" text-anchor="middle" class="t-title">2 · Engine#evaluate</text>
+    <text x="585" y="82" text-anchor="middle" class="t-sub">deterministic categories, then</text>
+    <text x="585" y="97" text-anchor="middle" class="t-sub">AI-trigger categories</text>
+    <text x="585" y="112" text-anchor="middle" class="t-sub">(auto_ai / former_manual)</text>
+
+    <rect x="725" y="40" width="190" height="92" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="820" y="64" text-anchor="middle" class="t-title">3 · On-demand vision</text>
+    <text x="820" y="82" text-anchor="middle" class="t-sub">only if needs_llm, has images,</text>
+    <text x="820" y="97" text-anchor="middle" class="t-sub">no vision data yet; ≤ 10 images;</text>
+    <text x="820" y="112" text-anchor="middle" class="t-sub">re-eval hybrid_vision once</text>
+
+    <!-- row 2 -->
+    <rect x="725" y="200" width="190" height="92" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="820" y="224" text-anchor="middle" class="t-title">4 · LLM verification</text>
+    <text x="820" y="242" text-anchor="middle" class="t-sub">callLlm parity; thresholds</text>
+    <text x="820" y="257" text-anchor="middle" class="t-sub">auto-approve 0.9 / auto-reject 0.85</text>
+    <text x="820" y="272" text-anchor="middle" class="t-sub">(from settings); no key → manual</text>
+
+    <rect x="490" y="200" width="190" height="92" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="585" y="224" text-anchor="middle" class="t-title">5 · Persist</text>
+    <text x="585" y="242" text-anchor="middle" class="t-sub">ModerationResult row · listing</text>
+    <text x="585" y="257" text-anchor="middle" class="t-sub">moderation_status · rule</text>
+    <text x="585" y="272" text-anchor="middle" class="t-sub">match_count / last_matched_at</text>
+
+    <rect x="255" y="200" width="190" height="92" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="350" y="224" text-anchor="middle" class="t-title">6 · Implio submission</text>
+    <text x="350" y="242" text-anchor="middle" class="t-sub">payload-parity with TS;</text>
+    <text x="350" y="257" text-anchor="middle" class="t-sub">IMPLIO_STUB default ON =</text>
+    <text x="350" y="272" text-anchor="middle" class="t-sub">log payload only; never blocks</text>
+
+    <!-- arrows -->
+    <line x1="210" y1="86" x2="247" y2="86" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <line x1="445" y1="86" x2="482" y2="86" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <line x1="680" y1="86" x2="717" y2="86" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <text x="684" y="78" class="t-label">needs_llm</text>
+    <line x1="820" y1="132" x2="820" y2="192" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <line x1="717" y1="246" x2="688" y2="246" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <line x1="482" y1="246" x2="453" y2="246" stroke="#4338ca" stroke-width="1.6" marker-end="url(#parr)"/>
+    <!-- deterministic bypass -->
+    <polyline points="585,132 585,165 600,165 600,192" fill="none" stroke="#64748b" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#parr)"/>
+    <text x="430" y="170" class="t-label">deterministic outcome — skips 3–4</text>
+  </svg>
+  <figcaption>Figure 2 — <code>Moderation::Runner.call(listing)</code>, steps 0–6. Steps 3–4 only run when an AI-trigger rule matched.</figcaption>
+  </figure>
+
+  <h3>Step by step</h3>
+  <ol>
+    <li><b>0 — AI parameter scan</b> (<code>Ai::ParamScan</code>): deterministic threshold
+      pre-checks (price/sqm anomalies, area mismatches, missing critical data, …) merged with a
+      Claude contextual verdict (<code>reject | review | ok</code>), persisted as an
+      <code>ai_parameter_scans</code> row. Cached — a previous scan is reused unless force-rescanned.
+      Failures are logged and <em>never</em> affect the moderation outcome.</li>
+    <li><b>1 — Load configuration</b>: all <code>enabled</code> rules, sorted by
+      <code>priority</code> ascending (stable tie-break on insertion order, matching JS
+      <code>Array#sort</code>); moderation lists resolved into rule configs via
+      <code>listRef</code>/<code>additionalListRef</code>/<code>excludeListRef</code>; settings
+      (single merged row over defaults).</li>
+    <li><b>2 — <code>Engine#evaluate</code></b>: pure-Ruby deterministic evaluation (no Rails, no
+      ActiveRecord — see §3). Produces either a final outcome or
+      <code>needs_llm</code> when an <code>auto_ai</code>/<code>former_manual</code> rule matched.</li>
+    <li><b>3 — On-demand vision</b>: if <code>needs_llm</code> and the listing has
+      <code>image_urls</code> but no vision data (<code>chat_gpt_property_condition</code> is nil),
+      <code>Ai::VisionAnalyzer</code> scores up to <code>maxImagesPerVisionScan</code> images
+      (setting, default 10), the <code>chat_gpt_*</code> fields are patched onto the listing, and
+      <code>hybrid_vision</code> rules are re-evaluated <em>once</em>. Only a freshly matched
+      <code>auto</code>/<code>reject</code> hybrid rule may short-circuit to rejection here.</li>
+    <li><b>4 — LLM verification</b> (<code>Moderation::LlmVerifier</code>, a port of the TS
+      <code>callLlm</code>): Claude reviews the AI-trigger matches and returns
+      <code>recommendation</code>/<code>confidence</code>/<code>notice</code>/<code>assessment</code>.
+      <code>Engine#decide_with_llm</code> applies the <code>autoApproveThreshold</code> (default 0.9)
+      and <code>autoRejectThreshold</code> (default 0.85) from settings; anything below threshold,
+      any invalid response, or a missing API key routes to the <b>manual</b> queue.</li>
+    <li><b>5 — Persist</b>: a <code>ModerationResult</code> row (camelCase
+      <code>rule_matches</code> jsonb, <code>llm_response</code>, confidence, epoch-ms
+      <code>processed_at</code>), the listing's <code>moderation_status</code>, and
+      <code>match_count</code>/<code>last_matched_at</code> on every matched rule (the synthetic
+      <code>llm_assessment</code> match is excluded).</li>
+    <li><b>6 — Implio submission</b> (<code>Integrations::ImplioClient</code>): forwards the
+      decision so existing Implio rules act on JamesEdition. With <code>IMPLIO_STUB</code> unset
+      or <code>"true"</code> (the default) the full payload is logged and no HTTP request is made.
+      Errors are swallowed — Implio can never fail a moderation run.</li>
+  </ol>
+
+  <h3>Entry points</h3>
+  <table>
+    <tr><th style="width:32%">Entry point</th><th>What happens</th></tr>
+    <tr>
+      <td><code>POST /api/listings/:id/moderate</code></td>
+      <td>Runs the pipeline above on an already-stored listing.</td>
+    </tr>
+    <tr>
+      <td><code>POST /api/moderate-by-id</code></td>
+      <td>Accepts JE ids or <code>jamesedition.com</code> URLs.
+        <code>Listings::FetchAndModerate</code> parses each input, fetches data through the
+        cascading <code>Listings::JeClient</code> chain — <b>mobile API → search API → HTML
+        scrape</b> — and upserts the listing. If <em>all</em> sources fail, a minimal record is
+        created and routed straight to <b>manual</b> with a synthetic
+        <code>data_fetch_failed</code> match. Listings in the configured
+        <code>visionCountries</code> (default <code>ES IT PT FR GR</code>) get a Claude vision
+        pre-scan before the engine runs.</td>
+    </tr>
+    <tr>
+      <td><code>POST /api/push-flagged</code></td>
+      <td>LAS/BigQuery pipeline webhook (header <code>X-Api-Key</code>, compared in constant time
+        via SHA-256 digests + <code>fixed_length_secure_compare</code>). Creates or updates the
+        listing with status <b>manual</b>, dedupes on <code>ai_validated_at</code> +
+        <code>user_message</code>, and enqueues <code>EnrichListingJob</code> to back-fill missing
+        fields from the JE API asynchronously (fill-missing-only; never overwrites existing data).</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ================================================================ 4. RULE ENGINE -->
+<section id="engine">
+  <h2><span class="secno">3</span>Rule engine</h2>
+  <p class="lead">
+    <code>Moderation::Engine</code> is pure Ruby (no Rails, no ActiveRecord) operating on
+    camelCase hashes — the exact shape of the Convex documents and of
+    <code>rails/db/seed_data/*.json</code>. Every rule has two independent axes: a
+    <b>category</b> (which evaluator runs, and whether it is deterministic or AI-triggering) and a
+    <b>tier + action</b> (what a match means for the outcome).
+  </p>
+
+  <h3>Categories (which evaluator, when)</h3>
+  <table>
+    <tr><th>Category</th><th>Phase</th><th>Evaluator &amp; behavior</th></tr>
+    <tr><td><code>simple_code</code></td><td>deterministic</td>
+      <td>Field conditions with operators (below), plus optional guards: <code>countryFilter</code>,
+        office/account-type filters, <code>feedSource</code>, <code>minPrice</code>. Rules with
+        <code>patterns</code>/<code>textLists</code> dispatch to the regex/keyword evaluator
+        (lists resolved via <code>listRef</code>/<code>excludeListRef</code>); rules with
+        <code>officeIds</code>/<code>officeNames</code> dispatch to the office evaluator.</td></tr>
+    <tr><td><code>hybrid_vision</code></td><td>deterministic</td>
+      <td>Checks against the <code>chat_gpt_*</code> vision scores (property condition, watermark
+        share/text, image quality/type). Skipped entirely when the listing has no vision data.</td></tr>
+    <tr><td><code>internal</code></td><td>deterministic</td>
+      <td>Structural rules (e.g. the synthetic <code>data_fetch_failed</code>); evaluated alongside
+        <code>simple_code</code>.</td></tr>
+    <tr><td><code>auto_ai</code> · <code>former_manual</code></td><td>AI-trigger</td>
+      <td>Evaluated after the deterministic pass (simple or regex evaluator). A match sets
+        <code>needs_llm</code> → on-demand vision (step 3) and LLM verification (step 4).</td></tr>
+    <tr><td><code>accuracy</code></td><td><i>disabled</i></td>
+      <td>Accuracy rules exist in seed data but are excluded from the deterministic filter —
+        the TS version commented them out on 2026-03-17 and the Ruby port mirrors this exactly.</td></tr>
+  </table>
+
+  <h3>Tier × action (what a match means)</h3>
+  <table>
+    <tr><th>Tier</th><th>Meaning</th></tr>
+    <tr><td><code>auto</code></td><td>Deterministic decision: <code>reject</code> rejects immediately,
+      <code>approve</code> approves immediately, <code>notice</code> approves-with-notice if nothing
+      stronger matched.</td></tr>
+    <tr><td><code>manual</code> / <code>verify</code></td><td>A match (or any <code>action: flag</code>)
+      sends the listing to the human review queue.</td></tr>
+  </table>
+
+  <figure>
+  <svg viewBox="0 0 980 560" role="img" aria-label="Engine decision precedence">
+    <defs>
+      <marker id="darr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+      </marker>
+    </defs>
+    <!-- condition boxes left -->
+    <rect x="30" y="20" width="330" height="56" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+    <text x="195" y="44" text-anchor="middle" class="t-title">any match with tier auto + action reject?</text>
+    <text x="195" y="62" text-anchor="middle" class="t-sub">first match's sellerMessage, confidence 1.0</text>
+
+    <rect x="30" y="110" width="330" height="56" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="195" y="134" text-anchor="middle" class="t-title">any match with tier auto + action approve?</text>
+    <text x="195" y="152" text-anchor="middle" class="t-sub">short-circuit, e.g. outdated_paid_approve</text>
+
+    <rect x="30" y="200" width="330" height="56" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="195" y="224" text-anchor="middle" class="t-title">any auto_ai / former_manual match?</text>
+    <text x="195" y="242" text-anchor="middle" class="t-sub">needs_llm → vision (if needed) + LLM verify</text>
+
+    <rect x="30" y="350" width="330" height="56" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="195" y="374" text-anchor="middle" class="t-title">any tier manual / verify, or action flag?</text>
+
+    <rect x="30" y="440" width="330" height="56" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="195" y="464" text-anchor="middle" class="t-title">any auto + notice matches?</text>
+    <text x="195" y="482" text-anchor="middle" class="t-sub">joined notice messages</text>
+
+    <!-- llm box -->
+    <rect x="470" y="186" width="480" height="120" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="710" y="210" text-anchor="middle" class="t-title">LLM verification (decide_with_llm)</text>
+    <text x="710" y="231" text-anchor="middle" class="t-sub">no LLM / invalid response / autoModeration off / below threshold → MANUAL</text>
+    <text x="710" y="250" text-anchor="middle" class="t-sub">confidence ≥ threshold (reject 0.85 · approve 0.9, settings-overridable):</text>
+    <text x="710" y="269" text-anchor="middle" class="t-sub">reject → REJECTED · approve + notice → NOTICE · approve → APPROVED</text>
+    <text x="710" y="290" text-anchor="middle" class="t-sub">a synthetic llm_assessment match is appended to rule_matches</text>
+
+    <!-- outcome pills -->
+    <rect x="470" y="30" width="150" height="36" rx="18" fill="#fef2f2" stroke="#fecaca"/>
+    <text x="545" y="53" text-anchor="middle" class="t-title" fill="#b91c1c">REJECTED</text>
+    <rect x="470" y="120" width="150" height="36" rx="18" fill="#ecfdf5" stroke="#a7f3d0"/>
+    <text x="545" y="143" text-anchor="middle" class="t-title" fill="#047857">APPROVED</text>
+    <rect x="470" y="360" width="150" height="36" rx="18" fill="#fffbeb" stroke="#fde68a"/>
+    <text x="545" y="383" text-anchor="middle" class="t-title" fill="#b45309">MANUAL</text>
+    <rect x="470" y="450" width="150" height="36" rx="18" fill="#eff6ff" stroke="#bfdbfe"/>
+    <text x="545" y="473" text-anchor="middle" class="t-title" fill="#1d4ed8">NOTICE</text>
+    <rect x="470" y="508" width="150" height="36" rx="18" fill="#ecfdf5" stroke="#a7f3d0"/>
+    <text x="545" y="531" text-anchor="middle" class="t-title" fill="#047857">APPROVED</text>
+
+    <!-- yes arrows -->
+    <line x1="360" y1="48" x2="462" y2="48" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="400" y="40" class="t-label">yes</text>
+    <line x1="360" y1="138" x2="462" y2="138" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="400" y="130" class="t-label">yes</text>
+    <line x1="360" y1="228" x2="462" y2="240" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="400" y="224" class="t-label">yes</text>
+    <line x1="360" y1="378" x2="462" y2="378" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="400" y="370" class="t-label">yes</text>
+    <line x1="360" y1="468" x2="462" y2="468" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="400" y="460" class="t-label">yes</text>
+    <!-- no arrows -->
+    <line x1="195" y1="76" x2="195" y2="102" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="203" y="95" class="t-label">no</text>
+    <line x1="195" y1="166" x2="195" y2="192" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="203" y="185" class="t-label">no</text>
+    <line x1="195" y1="256" x2="195" y2="342" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="203" y="305" class="t-label">no</text>
+    <line x1="195" y1="406" x2="195" y2="432" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="203" y="425" class="t-label">no</text>
+    <polyline points="195,496 195,526 462,526" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#darr)"/>
+    <text x="203" y="518" class="t-label">no → all clear</text>
+    <!-- llm box -> outcomes -->
+    <line x1="545" y1="186" x2="545" y2="164" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#darr)"/>
+    <polyline points="650,186 650,48 628,48" fill="none" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#darr)"/>
+    <line x1="545" y1="306" x2="545" y2="352" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#darr)"/>
+    <polyline points="650,306 650,468 628,468" fill="none" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#darr)"/>
+  </svg>
+  <figcaption>
+    Figure 3 — Exact decision precedence of <code>Engine#evaluate</code> /
+    <code>#decide_with_llm</code>: auto-reject &gt; auto-approve &gt; AI-trigger (LLM path) &gt;
+    manual &gt; notice &gt; approve.
+  </figcaption>
+  </figure>
+
+  <h3>Condition operators</h3>
+  <p>
+    From <code>rails/app/services/moderation/condition_evaluator.rb</code> — exact JS semantics:
+    numeric operators coerce both sides with JS <code>Number()</code> (NaN compares false), string
+    operators compare <code>String()</code> values case-insensitively, and a <code>nil</code>
+    listing value only ever satisfies <code>empty</code>/<code>is_null</code> (missing data never
+    matches).
+  </p>
+  <div class="pillrow">
+    <code>lt</code> <code>lte</code> <code>gt</code> <code>gte</code>
+    <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code>
+    <code>eq</code> <code>neq</code> <code>==</code> <code>!=</code>
+    <code>in</code> <code>not_in</code>
+    <code>contains</code> <code>not_contains</code>
+    <code>matches</code>
+    <code>empty</code> <code>not_empty</code>
+    <code>is_null</code> <code>is_not_null</code>
+    <code>is_true</code> <code>is_false</code>
+  </div>
+  <p><code>matches</code> builds a case-insensitive RegExp and returns false on an invalid pattern
+    rather than raising.</p>
+
+  <h3>Country normalization quirks</h3>
+  <p>
+    <code>country_matcher.rb</code> reconciles the three spellings JE data uses: ISO codes in rules
+    (<code>ES</code>, <code>IT</code>…), full names in listings ("Spain", "United Kingdom"), and
+    sometimes <em>region</em> names ("Algarve" → <code>PT</code>, "Tuscany" → <code>IT</code>,
+    "Dubai" → <code>AE</code>, "Florida" → <code>US</code>). <code>UK</code> is normalized to the
+    real ISO code <code>GB</code> so filters using either spelling match either form. Matching
+    tries: direct/case-insensitive equality → name→code → code→canonical-name → region fallback.
+  </p>
+
+  <h3>Golden-fixture parity</h3>
+  <div class="callout">
+    <b>How parity with the TypeScript original is proven.</b>
+    <code>scripts/golden/generate.ts</code> (run with <code>bun</code>) extracts the pure prelude
+    of <code>convex/moderation.ts</code> — <code>evaluateCondition</code>,
+    <code>evaluateSimpleRule</code>, <code>evaluateRegexRule</code>,
+    <code>evaluateHybridVisionRule</code>, <code>evaluateOfficeRule</code>,
+    <code>resolveListRefs</code>, the country maps — <em>without rewriting any logic</em>, loads
+    the real seed rules/lists plus synthetic <code>x_</code>-prefixed extras that exercise edge
+    paths (full operator set, hybrid check types, office rules, <code>minPrice</code>, priority
+    ties, a disabled rule), executes every fixture through the original decision flow, and writes
+    <code>rails/spec/fixtures/golden/expected.json</code>. The result: <b>66 golden fixtures, 59
+    distinct rules fired</b>, asserted in Ruby per fixture on ordered match names, outcome,
+    needs-LLM flag, LLM rule matches and seller message — all green.
+  </div>
+</section>
+
+<!-- ================================================================ 5. DATA MODEL -->
+<section id="data">
+  <h2><span class="secno">4</span>Data model</h2>
+  <p class="lead">
+    14 tables (<code>rails/db/migrate/</code>, one migration per table). Two conventions inherited
+    from the Convex era: <b>domain timestamps are epoch-millisecond bigints</b>
+    (<code>imported_at</code>, <code>processed_at</code>, <code>scanned_at</code>,
+    <code>created_at_ms</code>, …) alongside Rails' own <code>created_at/updated_at</code>
+    datetimes, and <b>jsonb payloads keep camelCase keys</b>
+    (<code>rule_matches</code>, <code>raw_data</code>, <code>llm_response</code>…) so the SPA
+    consumes records in the original Convex document shape.
+  </p>
+
+  <figure>
+  <svg viewBox="0 0 1060 800" role="img" aria-label="Entity-relationship diagram">
+    <defs>
+      <marker id="fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/>
+      </marker>
+    </defs>
+
+    <!-- ===== row 1 ===== -->
+    <!-- listings -->
+    <g>
+      <rect x="20" y="40" width="240" height="176" rx="8" fill="#ffffff" stroke="#a5b4fc"/>
+      <rect x="20" y="40" width="240" height="24" rx="8" fill="#eef2ff" stroke="#a5b4fc"/>
+      <text x="140" y="57" text-anchor="middle" class="t-head">listings</text>
+      <text x="30" y="82" class="t-mono">je_id  ·unique</text>
+      <text x="30" y="98" class="t-mono">title · moderation_status</text>
+      <text x="30" y="114" class="t-mono">price · currency · country</text>
+      <text x="30" y="130" class="t-mono">office · feed_source · lqi</text>
+      <text x="30" y="146" class="t-mono">chat_gpt_* (6 vision fields)</text>
+      <text x="30" y="162" class="t-mono">image_urls · raw_data  jsonb</text>
+      <text x="30" y="178" class="t-mono">accuracy_* (LAS push fields)</text>
+      <text x="30" y="194" class="t-mono">imported_at  bigint ms</text>
+      <text x="30" y="210" class="t-mono">…</text>
+    </g>
+    <!-- moderation_results -->
+    <g>
+      <rect x="282" y="40" width="240" height="176" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="282" y="40" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="402" y="57" text-anchor="middle" class="t-head">moderation_results</text>
+      <text x="292" y="82" class="t-mono">listing_id  → listings</text>
+      <text x="292" y="98" class="t-mono">je_id · outcome</text>
+      <text x="292" y="114" class="t-mono">rule_matches  jsonb</text>
+      <text x="292" y="130" class="t-mono">llm_triggered · llm_response jsonb</text>
+      <text x="292" y="146" class="t-mono">confidence · seller_message</text>
+      <text x="292" y="162" class="t-mono">original_outcome · overridden_by</text>
+      <text x="292" y="178" class="t-mono">override_reason · refuse_reason_type</text>
+      <text x="292" y="194" class="t-mono">vision_result jsonb · vision_model</text>
+      <text x="292" y="210" class="t-mono">processed_at  bigint ms</text>
+    </g>
+    <!-- ai_parameter_scans -->
+    <g>
+      <rect x="544" y="40" width="240" height="128" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="544" y="40" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="664" y="57" text-anchor="middle" class="t-head">ai_parameter_scans</text>
+      <text x="554" y="82" class="t-mono">listing_id  → listings</text>
+      <text x="554" y="98" class="t-mono">je_id · verdict (reject|review|ok)</text>
+      <text x="554" y="114" class="t-mono">flags  jsonb · flag_count</text>
+      <text x="554" y="130" class="t-mono">confidence · summary</text>
+      <text x="554" y="146" class="t-mono">model · tokens_used</text>
+      <text x="554" y="162" class="t-mono">scanned_at  bigint ms</text>
+    </g>
+    <!-- image_recognition_results -->
+    <g>
+      <rect x="806" y="40" width="240" height="112" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="806" y="40" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="926" y="57" text-anchor="middle" class="t-head">image_recognition_results</text>
+      <text x="816" y="82" class="t-mono">listing_id  → listings (nullable)</text>
+      <text x="816" y="98" class="t-mono">je_id · title · llm</text>
+      <text x="816" y="114" class="t-mono">image_urls  jsonb</text>
+      <text x="816" y="130" class="t-mono">result  jsonb</text>
+      <text x="816" y="146" class="t-mono">analyzed_at  bigint ms</text>
+    </g>
+
+    <!-- ===== row 2 ===== -->
+    <!-- moderators -->
+    <g>
+      <rect x="20" y="250" width="240" height="128" rx="8" fill="#ffffff" stroke="#a5b4fc"/>
+      <rect x="20" y="250" width="240" height="24" rx="8" fill="#eef2ff" stroke="#a5b4fc"/>
+      <text x="140" y="267" text-anchor="middle" class="t-head">moderators (Devise)</text>
+      <text x="30" y="292" class="t-mono">email  ·unique</text>
+      <text x="30" y="308" class="t-mono">encrypted_password (bcrypt)</text>
+      <text x="30" y="324" class="t-mono">name · role admin|moderator|viewer</text>
+      <text x="30" y="340" class="t-mono">status active|invited|disabled</text>
+      <text x="30" y="356" class="t-mono">invited_by · action_count</text>
+      <text x="30" y="372" class="t-mono">last_login_at  bigint ms</text>
+    </g>
+    <!-- moderation_notes -->
+    <g>
+      <rect x="282" y="250" width="240" height="112" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="282" y="250" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="402" y="267" text-anchor="middle" class="t-head">moderation_notes</text>
+      <text x="292" y="292" class="t-mono">listing_id  → listings</text>
+      <text x="292" y="308" class="t-mono">je_id</text>
+      <text x="292" y="324" class="t-mono">author_name · author_role</text>
+      <text x="292" y="340" class="t-mono">content</text>
+      <text x="292" y="356" class="t-mono">created_at_ms  bigint ms</text>
+    </g>
+    <!-- remediation_results -->
+    <g>
+      <rect x="544" y="250" width="240" height="128" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="544" y="250" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="664" y="267" text-anchor="middle" class="t-head">remediation_results</text>
+      <text x="554" y="292" class="t-mono">listing_id  → listings</text>
+      <text x="554" y="308" class="t-mono">je_id · model</text>
+      <text x="554" y="324" class="t-mono">suggestions  jsonb</text>
+      <text x="554" y="340" class="t-mono">error_count · has_fixable_errors</text>
+      <text x="554" y="356" class="t-mono">total_confidence</text>
+      <text x="554" y="372" class="t-mono">scanned_at  bigint ms</text>
+    </g>
+    <!-- listing_image_analyses -->
+    <g>
+      <rect x="806" y="250" width="240" height="128" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="806" y="250" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="926" y="267" text-anchor="middle" class="t-head">listing_image_analyses</text>
+      <text x="816" y="292" class="t-mono">je_id · title  (no FK)</text>
+      <text x="816" y="308" class="t-mono">total_images · analyzed_images</text>
+      <text x="816" y="324" class="t-mono">per_image_results  jsonb</text>
+      <text x="816" y="340" class="t-mono">summary  jsonb</text>
+      <text x="816" y="356" class="t-mono">implio_status · implio_submitted_at</text>
+      <text x="816" y="372" class="t-mono">analyzed_at  bigint ms</text>
+    </g>
+
+    <!-- ===== row 3 ===== -->
+    <!-- moderator_activities -->
+    <g>
+      <rect x="20" y="430" width="240" height="112" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="20" y="430" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="140" y="447" text-anchor="middle" class="t-head">moderator_activities</text>
+      <text x="30" y="472" class="t-mono">moderator_id  → moderators</text>
+      <text x="30" y="488" class="t-mono">moderator_name · action</text>
+      <text x="30" y="504" class="t-mono">target_type · target_id</text>
+      <text x="30" y="520" class="t-mono">details</text>
+      <text x="30" y="536" class="t-mono">timestamp  bigint ms</text>
+    </g>
+    <!-- rules -->
+    <g>
+      <rect x="282" y="430" width="240" height="160" rx="8" fill="#ffffff" stroke="#a5b4fc"/>
+      <rect x="282" y="430" width="240" height="24" rx="8" fill="#eef2ff" stroke="#a5b4fc"/>
+      <text x="402" y="447" text-anchor="middle" class="t-head">rules</text>
+      <text x="292" y="472" class="t-mono">name  ·unique</text>
+      <text x="292" y="488" class="t-mono">display_name · category</text>
+      <text x="292" y="504" class="t-mono">tier · action · priority</text>
+      <text x="292" y="520" class="t-mono">config  jsonb (conditions, listRef…)</text>
+      <text x="292" y="536" class="t-mono">enabled · listing_category</text>
+      <text x="292" y="552" class="t-mono">seller_message</text>
+      <text x="292" y="568" class="t-mono">match_count · false_positive_count</text>
+      <text x="292" y="584" class="t-mono">last_matched_at  bigint ms</text>
+    </g>
+    <!-- moderation_lists -->
+    <g>
+      <rect x="544" y="430" width="240" height="112" rx="8" fill="#ffffff" stroke="#a5b4fc"/>
+      <rect x="544" y="430" width="240" height="24" rx="8" fill="#eef2ff" stroke="#a5b4fc"/>
+      <text x="664" y="447" text-anchor="middle" class="t-head">moderation_lists</text>
+      <text x="554" y="472" class="t-mono">name  ·unique</text>
+      <text x="554" y="488" class="t-mono">display_name · category</text>
+      <text x="554" y="504" class="t-mono">items  jsonb · item_count</text>
+      <text x="554" y="520" class="t-mono">source · description</text>
+      <text x="554" y="536" class="t-mono">updated_at_ms  bigint ms</text>
+    </g>
+    <!-- message_templates -->
+    <g>
+      <rect x="806" y="430" width="240" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="806" y="430" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="926" y="447" text-anchor="middle" class="t-head">message_templates</text>
+      <text x="816" y="472" class="t-mono">name  ·unique</text>
+      <text x="816" y="488" class="t-mono">display_name · category</text>
+      <text x="816" y="504" class="t-mono">subject · body</text>
+      <text x="816" y="520" class="t-mono">is_default</text>
+    </g>
+
+    <!-- ===== row 4 ===== -->
+    <!-- legend -->
+    <g>
+      <rect x="20" y="630" width="240" height="96" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="30" y="652" class="t-title">Legend</text>
+      <line x1="30" y1="668" x2="70" y2="668" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+      <text x="78" y="672" class="t-sub">belongs_to (DB foreign key)</text>
+      <text x="30" y="692" class="t-sub">·unique = unique index</text>
+      <text x="30" y="708" class="t-sub">bigint ms = epoch-millisecond timestamp</text>
+    </g>
+    <!-- daily_stats -->
+    <g>
+      <rect x="282" y="630" width="240" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+      <rect x="282" y="630" width="240" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="402" y="647" text-anchor="middle" class="t-head">daily_stats</text>
+      <text x="292" y="672" class="t-mono">date  ·unique</text>
+      <text x="292" y="688" class="t-mono">total · approved · rejected</text>
+      <text x="292" y="704" class="t-mono">manual · noticed</text>
+      <text x="292" y="720" class="t-mono">llm_calls · avg_confidence</text>
+    </g>
+    <!-- settings -->
+    <g>
+      <rect x="544" y="630" width="240" height="144" rx="8" fill="#ffffff" stroke="#a5b4fc"/>
+      <rect x="544" y="630" width="240" height="24" rx="8" fill="#eef2ff" stroke="#a5b4fc"/>
+      <text x="664" y="647" text-anchor="middle" class="t-head">settings (single row)</text>
+      <text x="554" y="672" class="t-mono">key  ·unique ("app_settings")</text>
+      <text x="554" y="688" class="t-mono">auto_approve/reject_threshold</text>
+      <text x="554" y="704" class="t-mono">vision_model · param_scan_model</text>
+      <text x="554" y="720" class="t-mono">vision_countries  jsonb</text>
+      <text x="554" y="736" class="t-mono">max_images_per_vision_scan</text>
+      <text x="554" y="752" class="t-mono">enable_auto_moderation · alert_*</text>
+      <text x="554" y="768" class="t-mono">updated_at_ms  bigint ms</text>
+    </g>
+
+    <!-- ===== FK arrows ===== -->
+    <!-- moderation_results -> listings -->
+    <line x1="282" y1="78" x2="268" y2="78" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+    <!-- ai_parameter_scans -> listings via top corridor -->
+    <polyline points="544,78 534,78 534,26 140,26 140,34" fill="none" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+    <!-- image_recognition_results -> listings via top corridor -->
+    <polyline points="806,78 796,78 796,14 100,14 100,34" fill="none" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+    <!-- moderation_notes -> listings -->
+    <polyline points="282,288 200,288 200,222" fill="none" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+    <!-- remediation_results -> listings via corridor between rows -->
+    <polyline points="604,250 604,232 240,232 240,222" fill="none" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+    <!-- moderator_activities -> moderators -->
+    <line x1="140" y1="430" x2="140" y2="384" stroke="#4338ca" stroke-width="1.5" marker-end="url(#fk)"/>
+  </svg>
+  <figcaption>
+    Figure 4 — All 14 tables with key columns (full definitions in
+    <code>rails/db/schema.rb</code>). Indigo headers mark the tables you will touch most.
+  </figcaption>
+  </figure>
+
+  <ul>
+    <li><b>Natural keys</b>: <code>listings.je_id</code>, <code>rules.name</code>,
+      <code>moderation_lists.name</code>, <code>message_templates.name</code>,
+      <code>moderators.email</code>, <code>daily_stats.date</code>, <code>settings.key</code> are
+      unique — these drive the idempotent <code>convex:import</code> upserts (§7).</li>
+    <li><b><code>settings</code> is one row</b>, merged over <code>Setting.defaults</code> at read
+      time (<code>Setting.current</code>) — nil columns fall back to the defaults ported verbatim
+      from <code>convex/settings.ts</code>.</li>
+    <li><b><code>listings.chat_gpt_*</code></b> are the persisted Claude vision scores (property
+      condition, watermark share/text, image quality/type, conclusion) that
+      <code>hybrid_vision</code> rules read.</li>
+  </ul>
+</section>
+
+<!-- ================================================================ 6. REST API -->
+<section id="api">
+  <h2><span class="secno">5</span>REST API</h2>
+  <p class="lead">
+    Full contract with payload shapes: <code>docs/rails_api_contract.md</code>. Everything is
+    JSON under <code>/api</code>; records serialize like Convex docs (<code>_id</code>,
+    <code>_creationTime</code>, camelCase keys, epoch-ms timestamps), so SPA components consume
+    them unchanged.
+  </p>
+
+  <div class="callout">
+    <b>Auth model.</b> Devise session cookie + CSRF token: the SPA calls
+    <code>GET /api/session</code> to get <code>{ user, csrfToken }</code> (also set as a readable
+    <code>XSRF-TOKEN</code> cookie) and sends <code>X-CSRF-Token</code> on every non-GET request.
+    Roles: <b>viewer</b> (read), <b>moderator</b> (moderate &amp; override), <b>admin</b> (manage
+    rules / lists / messages / settings / users). Any <em>active</em> account passes the moderator
+    check (viewers included — TS parity); admin-only writes return <code>403</code> otherwise.
+  </div>
+
+  <table>
+    <tr><th style="width:46%">Endpoint</th><th style="width:11%">Auth</th><th>Purpose</th></tr>
+    <tr class="group"><td colspan="3">Auth / session</td></tr>
+    <tr><td><code>GET / POST / DELETE /api/session</code></td><td>none / session</td><td>Session probe + CSRF token · login · logout</td></tr>
+    <tr><td><code>POST /api/password</code> · <code>PUT /api/password</code></td><td>none</td><td>Request / complete a Devise password reset</td></tr>
+    <tr class="group"><td colspan="3">Listings &amp; moderation</td></tr>
+    <tr><td class="wrapcode"><code>GET /api/listings</code> · <code>/pending</code> · <code>/recent</code> · <code>/stats</code> · <code>/:id</code> · <code>/by-je-id/:jeId</code></td><td>moderator</td><td>Queue (status=manual), recents, status counts, detail lookups</td></tr>
+    <tr><td><code>POST /api/listings/:id/moderate</code></td><td>moderator</td><td>Run the moderation pipeline (§2)</td></tr>
+    <tr><td><code>POST /api/moderate-by-id</code></td><td>moderator</td><td>Fetch from JE (mobile API → search API → HTML scrape → minimal record) then moderate; accepts ids or URLs</td></tr>
+    <tr><td class="wrapcode"><code>GET /api/moderation-results/recent</code> · <code>/by-outcome</code> · <code>/by-rule</code> · <code>/for-listing/:id</code> · <code>/latest-by-je-id/:jeId</code></td><td>moderator</td><td>Moderation log queries</td></tr>
+    <tr><td class="wrapcode"><code>POST /api/moderation-results/:id/override</code> · <code>/override-with-implio</code></td><td>moderator</td><td>Human override (stores <code>originalOutcome</code>, attribution); the latter also submits to Implio</td></tr>
+    <tr><td class="wrapcode"><code>GET /api/dashboard/stats</code> · <code>/export-csv</code></td><td>moderator</td><td>Dashboard aggregates + CSV export rows</td></tr>
+    <tr class="group"><td colspan="3">Configuration (reads: moderator · writes: admin)</td></tr>
+    <tr><td class="wrapcode"><code>/api/rules</code> CRUD · <code>POST /api/rules/:id/toggle</code> · <code>POST /api/rules/suggest</code></td><td>admin*</td><td>Rule management; <code>suggest</code> is the AI rule suggester (moderator)</td></tr>
+    <tr><td class="wrapcode"><code>/api/lists</code> CRUD · <code>/:id/items</code> add/remove · <code>POST /api/lists/seed</code> · <code>/suggest</code></td><td>admin*</td><td>Keyword/pattern lists; reseed from JSON; AI list suggester</td></tr>
+    <tr><td><code>/api/messages</code> CRUD</td><td>admin*</td><td>Seller message templates</td></tr>
+    <tr><td class="wrapcode"><code>GET/PATCH /api/settings</code> · <code>POST /api/settings/reset</code></td><td>admin*</td><td>Thresholds, models, vision countries (merged over defaults)</td></tr>
+    <tr><td class="wrapcode"><code>/api/users</code> CRUD · <code>/stats</code> · <code>/:id/activity</code> · <code>/:id/reactivate</code> · <code>set-password</code> · <code>GET /api/activity</code></td><td>admin*</td><td>Team management (soft delete = status disabled); activity feed is moderator-readable</td></tr>
+    <tr class="group"><td colspan="3">AI tooling</td></tr>
+    <tr><td class="wrapcode"><code>GET /api/listings/:listingId/notes</code> · <code>POST …/notes</code> · <code>DELETE /api/notes/:id</code></td><td>moderator</td><td>Per-listing moderator notes</td></tr>
+    <tr><td class="wrapcode"><code>POST /api/listings/:id/param-scan</code> · <code>GET /api/param-scans/recent</code> · <code>/stats</code> · <code>/by-je-id/:jeId</code></td><td>moderator</td><td>AI parameter scans</td></tr>
+    <tr><td class="wrapcode"><code>/api/image-recognition/*</code> (results, analyses, <code>analyze</code>, <code>analyze-listing-url</code>, <code>submit-implio</code>)</td><td>moderator</td><td>Ad-hoc Claude vision (GPT-4o fallback) + Implio submission of manual decisions</td></tr>
+    <tr><td class="wrapcode"><code>GET /api/remediation/stats</code> · <code>/recent</code> · <code>POST /api/remediation/batch-scan</code></td><td>moderator</td><td>AI listing-remediation suggestions</td></tr>
+    <tr class="group"><td colspan="3">System (no session)</td></tr>
+    <tr><td><code>POST /api/push-flagged</code></td><td>X-Api-Key</td><td>LAS pipeline push; constant-time key comparison; creates/updates listing as <b>manual</b>, enqueues <code>EnrichListingJob</code></td></tr>
+    <tr><td><code>GET /image-proxy?url=</code></td><td>none</td><td>Server-side image fetch; https-only, parsed hostname must be <code>jamesedition.com</code> or a subdomain</td></tr>
+  </table>
+  <p style="font-size:13px; color:var(--muted)">* reads require an active moderator account of any role; writes require admin and return <code>403</code> otherwise.</p>
+</section>
+
+<!-- ================================================================ 7. FRONTEND -->
+<section id="frontend">
+  <h2><span class="secno">6</span>Frontend</h2>
+  <p class="lead">
+    React 19 + Vite + Tailwind CSS 4 with shadcn/ui components (<code>src/components/ui/</code>).
+    The SPA predates the Rails rewrite — it used to talk to Convex — so the data layer was swapped
+    for REST + polling while components stayed untouched.
+  </p>
+
+  <div class="cols2">
+    <div>
+      <h3>Pages (<code>src/pages/</code>)</h3>
+      <table>
+        <tr><th>Route</th><th>Page</th></tr>
+        <tr><td><code>/</code> · <code>/login</code></td><td>Landing · Login (signup redirects to login)</td></tr>
+        <tr><td><code>/dashboard</code></td><td>Dashboard — stats, daily charts, CSV export</td></tr>
+        <tr><td><code>/queue</code></td><td>Queue — manual-review listings</td></tr>
+        <tr><td><code>/moderation-log</code></td><td>Moderation Log — results history, overrides</td></tr>
+        <tr><td><code>/rules</code> · <code>/lists</code> · <code>/messages</code></td><td>Rules · Lists · Message templates</td></tr>
+        <tr><td><code>/image-recognition</code></td><td>Image Recognition — ad-hoc vision runs</td></tr>
+        <tr><td><code>/moderate-by-id</code></td><td>Moderate by URL — paste ids/URLs, fetch &amp; moderate</td></tr>
+        <tr><td><code>/settings</code></td><td>Settings — incl. the Team tab (<code>/users</code> redirects to <code>/settings?tab=team</code>)</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Data layer</h3>
+      <ul>
+        <li><code>src/lib/apiClient.ts</code> — typed REST client; Convex-style args objects keep
+          call sites mechanical; injects the CSRF token on non-GET requests.</li>
+        <li><code>src/hooks/useApiQuery.ts</code> — polling replacement for Convex's reactive
+          <code>useQuery</code>/<code>useMutation</code>: fetch on mount/arg change, silent
+          <code>pollMs</code> polling (<b>sidebar badge 7&nbsp;s</b>, <b>queue 10&nbsp;s</b>), and a
+          global refetch registry — <code>useApiMutation</code> refetches <em>all</em> mounted
+          queries after a successful mutation, restoring cross-component reactivity.</li>
+        <li><code>src/contexts/AuthContext.tsx</code> — probes <code>GET /api/session</code> on
+          boot, stores user + CSRF token, exposes <code>signIn/signOut</code>; any API 401
+          dispatches a global auth-expired event that drops the session.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 8. DEPLOYMENT -->
+<section id="ops">
+  <h2><span class="secno">7</span>Deployment &amp; ops</h2>
+  <p class="lead">The service topology is in §1 (Figure 1). Operationally there are three compose files, one secrets file, and one data-migration rake task.</p>
+
+  <h3>Compose files</h3>
+  <table>
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td><code>docker-compose.yml</code></td>
+      <td>Base stack: <code>db</code> (postgres:16-alpine), <code>web</code> (Rails),
+        <code>jobs</code> (<code>./bin/jobs</code>), <code>frontend</code> (nginx + SPA build).
+        Boots standalone on <code>:8080</code> with insecure dev defaults.</td></tr>
+    <tr><td><code>docker-compose.prod.yml</code></td>
+      <td>Production overlay: adds <code>caddy</code> (automatic Let's Encrypt TLS for
+        <code>$DOMAIN</code>, ports 80/443), restart policies, binds the frontend to localhost
+        behind the proxy. Used with <code>.env.production</code>.</td></tr>
+    <tr><td><code>docker-compose.e2e.yml</code></td>
+      <td>E2E overlay: adds a <code>mock-je</code> Node container
+        (<code>scripts/e2e/mock-je-server.mjs</code>) and points Rails at it via
+        <code>JE_API_BASE</code> — for CI/sandboxes where <code>www.jamesedition.com</code> is
+        unreachable.</td></tr>
+  </table>
+
+  <h3>Key environment variables</h3>
+  <table>
+    <tr><th>Variable</th><th>Purpose</th></tr>
+    <tr><td><code>DOMAIN</code></td><td>Public hostname for the Caddy TLS overlay (required in prod)</td></tr>
+    <tr><td><code>SECRET_KEY_BASE</code></td><td>Rails secrets — compose ships an insecure local default; set a real one in prod</td></tr>
+    <tr><td><code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> / <code>DEFAULT_USER_PASSWORD</code></td><td>Seeded admin login; default password for admin-created users</td></tr>
+    <tr><td><code>LAS_PUSH_API_KEY</code></td><td>Shared secret for <code>POST /api/push-flagged</code></td></tr>
+    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude vision, param scans, LLM verification, rule/list suggesters (optional — without it AI-trigger rules route to manual)</td></tr>
+    <tr><td><code>OPENAI_API_KEY</code></td><td>GPT-4o fallback vision provider</td></tr>
+    <tr><td><code>IMPLIO_STUB</code> / <code>IMPLIO_API_KEY</code></td><td><b>Stub defaults ON</b> (unset ⇒ payloads logged, nothing sent); the key is only used with <code>IMPLIO_STUB=false</code></td></tr>
+    <tr><td><code>SMTP_*</code></td><td>Devise password-reset mail; without <code>SMTP_ADDRESS</code> deliveries are disabled</td></tr>
+  </table>
+
+  <h3>Importing production data — <code>convex:import</code></h3>
+  <p>
+    <code>bin/rails "convex:import[/path/to/export.zip]"</code>
+    (<code>rails/lib/tasks/convex_import.rake</code>) imports an <code>npx convex export</code>
+    ZIP or directory (both layouts supported). It maps camelCase docs to snake_case columns,
+    remaps Convex <code>_id</code> references to integer FKs (falling back to
+    <code>je_id</code> lookup), and upserts on natural keys — composite keys for history tables —
+    so <b>re-runs are idempotent</b>. Semantics are a <b>merge</b>: prod rows win on natural-key
+    conflicts while seed-only rows remain. Verified against the real production export (June
+    2026): 67 listings, 75 results, <b>82 rules after merge</b>, 6 moderators — zero errors, clean
+    second run. Convex Scrypt password hashes are not portable; imported moderators get a random
+    password and use reset / admin set-password.
+  </p>
+  <p>
+    Further reading: <code>DEPLOY.md</code> (production runbook), <code>HANDOFF.md</code>
+    (env vars, import details, operational notes), <code>MIGRATION_STATUS.md</code> (acceptance
+    criteria and verification evidence).
+  </p>
+</section>
+
+<!-- ================================================================ 9. TESTING -->
+<section id="testing">
+  <h2><span class="secno">8</span>Testing &amp; quality</h2>
+  <table>
+    <tr><th>Check</th><th>Status</th></tr>
+    <tr><td>RSpec</td><td><b>586 examples, 0 failures</b> — 70 model · 225 service (including the 66 golden-fixture parity cases) · 277 request · 13 job · 1 lib</td></tr>
+    <tr><td>Golden parity</td><td>66 fixtures generated by <em>executing the original TypeScript evaluators</em> with bun (<code>scripts/golden/generate.ts</code>); 59 distinct rules fired; Ruby matches all — ordered match names, outcomes, needs-LLM flags, seller messages</td></tr>
+    <tr><td>Lint / types</td><td>RuboCop (rails-omakase) clean · frontend <code>tsc --noEmit</code> clean · Vite build green</td></tr>
+    <tr><td>End-to-end</td><td>Playwright, <b>23/23 assertions</b> headless against the fresh-clone compose stack (login, every page, rules CRUD round-trip, full moderate-by-id flow) using the mock-JE overlay</td></tr>
+  </table>
+  <ul>
+    <li><b>No live network in tests</b>: <code>WebMock.disable_net_connect!</code> globally — every
+      Claude/OpenAI/Implio/JE interaction in the suite is stubbed, so tests can never spend API
+      credits or touch production systems.</li>
+    <li><b>Implio stub safety</b>: because <code>IMPLIO_STUB</code> defaults ON, even a fully
+      configured production deploy submits nothing to Implio until it is explicitly switched off —
+      payloads are logged for inspection first.</li>
+  </ul>
+</section>
+
+<!-- ================================================================ 10. FOOTER / REPO MAP -->
+<section id="map">
+  <h2><span class="secno">9</span>Repo map &amp; where to start</h2>
+<pre><code>feedlens_moderation/
+├── convex/            frozen original TypeScript backend (branch typescript-v1) — reference only
+├── rails/             the Rails 8 backend: app/, db/migrate/, spec/, lib/tasks/convex_import.rake
+├── src/               React 19 SPA: pages/, components/, hooks/, lib/apiClient.ts, contexts/
+├── scripts/golden/    golden-fixture generator (bun executes the real TS evaluators)
+├── scripts/e2e/       Playwright e2e runner + mock JE mobile API server
+├── docs/              rails_api_contract.md · rails_rewrite_spec.md · this document
+└── docker/            nginx.conf (SPA + /api proxy) · Caddyfile (TLS)</code></pre>
+
+  <h3>Where to start reading</h3>
+  <ol>
+    <li><code>rails/app/services/moderation/runner.rb</code> — the whole pipeline in 260 lines.</li>
+    <li><code>rails/app/services/moderation/engine.rb</code> — the decision flow; pure Ruby, reads top-to-bottom.</li>
+    <li><code>src/lib/apiClient.ts</code> — every frontend↔backend interaction in one file.</li>
+    <li><code>docs/rails_api_contract.md</code> — the authoritative API contract (payload shapes, auth rules, job inventory).</li>
+  </ol>
+
+  <footer class="colophon">
+    FeedLens Moderation · internal engineering document · facts verified against the repository on 2026-06-11.
+  </footer>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav a.navlink"));
+  var sections = links
+    .map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+    .filter(Boolean);
+  function setActive(id) {
+    links.forEach(function (a) {
+      a.classList.toggle("active", a.getAttribute("href") === "#" + id);
+    });
+  }
+  if ("IntersectionObserver" in window) {
+    var visible = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      for (var i = sections.length - 1; i >= 0; i--) {
+        if (visible[sections[i].id]) { setActive(sections[i].id); return; }
+      }
+    }, { rootMargin: "-20% 0px -60% 0px" });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
