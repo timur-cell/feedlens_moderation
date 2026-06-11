@@ -40,8 +40,9 @@ nano .env.production
 ```
 
 Fill in at minimum: `DOMAIN`, `SECRET_KEY_BASE` (`openssl rand -hex 64`),
-`DATABASE_PASSWORD`, `ADMIN_PASSWORD`, `LAS_PUSH_API_KEY`, `ANTHROPIC_API_KEY`.
-Leave `IMPLIO_STUB=true` for the trial period.
+`DATABASE_PASSWORD`, `ADMIN_PASSWORD`, `ANTHROPIC_API_KEY`.
+Leave `IMPLIO_STUB=true` for the trial period. The LAS webhook stays disabled
+until you set `LAS_PUSH_API_KEY` (planned for later).
 
 ## 5. Boot
 
@@ -73,9 +74,15 @@ self-service reset).
 
 - Run one **Moderate by URL** with a real JE listing URL (verifies live JE API access).
 - Run one **image analysis** on the Image Recognition page (verifies the Anthropic key).
-- Point the LAS feed at `https://<domain>/api/push-flagged` with the `X-Api-Key` you set.
 - When ready for real Implio submissions: set `IMPLIO_STUB=false` + `IMPLIO_API_KEY` in
   `.env.production` and `docker compose ... up -d` again.
+
+## Enabling the LAS feed later
+
+Set `LAS_PUSH_API_KEY` in `.env.production` (e.g. `openssl rand -hex 24`), re-run the
+`up -d` command, and point the LAS pipeline at `https://<domain>/api/push-flagged` with
+that key in the `X-Api-Key` header. Until the key is set, the endpoint rejects all
+requests with 401.
 
 ## Operations
 
