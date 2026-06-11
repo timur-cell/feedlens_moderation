@@ -19,7 +19,7 @@ RSpec.describe Rule, type: :model do
   it "requires a known category" do
     expect(build(:rule, category: "bogus")).not_to be_valid
 
-    %w[simple_code hybrid_vision auto_ai former_manual internal accuracy].each do |category|
+    %w[simple_code hybrid_vision auto_ai former_manual internal].each do |category|
       expect(build(:rule, category: category)).to be_valid
     end
   end

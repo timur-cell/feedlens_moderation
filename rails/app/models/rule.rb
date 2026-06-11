@@ -1,5 +1,5 @@
 class Rule < ApplicationRecord
-  CATEGORIES = %w[simple_code hybrid_vision auto_ai former_manual internal accuracy].freeze
+  CATEGORIES = %w[simple_code hybrid_vision auto_ai former_manual internal].freeze
   TIERS = %w[auto verify manual].freeze
   ACTIONS = %w[reject notice flag approve].freeze
 

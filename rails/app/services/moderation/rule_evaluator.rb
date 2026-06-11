@@ -4,7 +4,7 @@ require_relative "condition_evaluator"
 
 # Port of the per-rule evaluators from convex/moderation.ts:
 # evaluateSimpleRule, evaluateRegexRule, evaluateHybridVisionRule,
-# evaluateAccuracyRule, evaluateOfficeRule and resolveListRefs/escapeRegex.
+# evaluateOfficeRule and resolveListRefs/escapeRegex.
 #
 # Listings, configs and lists are plain Hashes with camelCase string keys —
 # the same shape as the Convex documents / db/seed_data JSON files.
@@ -533,67 +533,6 @@ module Moderation
 
       # Fallback: no recognized vision check type
       { matched: false, details: "no vision check type matched in config" }
-    end
-
-    # ─── evaluateAccuracyRule (LAS integration) ─────────────────────
-    # NOTE: the accuracy category is disabled in the deterministic phase
-    # (commented out in moderation.ts on 2026-03-17), so this evaluator is
-    # currently unreachable from Engine#evaluate. It is ported to keep parity
-    # with the TS file for an eventual rollback.
-    def evaluate_accuracy(listing, config)
-      flags = JsCompat.js_or(listing["accuracyFlags"], [])
-      score = listing["accuracyScore"]
-      acct_type = fallback(listing["officeSubscription"], listing["accountType"]).downcase
-
-      # Account type filter
-      if config["accountTypeFilter"].is_a?(Array)
-        if acct_type.empty? || config["accountTypeFilter"].none? { |f| acct_type.include?(f.downcase) }
-          return { matched: false, details: "accountType #{acct_type.empty? ? "unknown" : acct_type} not in #{interp(config["accountTypeFilter"])}" }
-        end
-      end
-
-      # No accuracy data at all -> skip
-      if flags.empty? && score.nil?
-        return { matched: false, details: "no LAS accuracy data" }
-      end
-
-      # Score-based check (e.g. las_score_critical)
-      unless config["maxAccuracyScore"].nil?
-        if !score.nil? && JsCompat.js_number(score) <= JsCompat.js_number(config["maxAccuracyScore"])
-          return { matched: true, details: "accuracy score #{format("%.2f", score)} ≤ #{interp(config["maxAccuracyScore"])}" }
-        end
-        if score.nil?
-          return { matched: false, details: "no accuracy score available" }
-        end
-        return { matched: false, details: "accuracy score #{format("%.2f", score)} > #{interp(config["maxAccuracyScore"])}" }
-      end
-
-      # Single flag check
-      if config["accuracyFlag"].is_a?(String) && JsCompat.js_truthy?(config["accuracyFlag"])
-        if flags.include?(config["accuracyFlag"])
-          return { matched: true, details: "LAS flag: #{config["accuracyFlag"]} (score: #{score.nil? ? "n/a" : format("%.2f", score)})" }
-        end
-        return { matched: false, details: "flag #{config["accuracyFlag"]} not in [#{flags.join(", ")}]" }
-      end
-
-      # Multi-flag check (matchAny = true -> any flag matches; false -> all must match)
-      if config["accuracyFlags"].is_a?(Array)
-        match_any = config["matchAny"] != false # default true
-        matched =
-          if match_any
-            config["accuracyFlags"].any? { |f| flags.include?(f) }
-          else
-            config["accuracyFlags"].all? { |f| flags.include?(f) }
-          end
-
-        if matched
-          found = config["accuracyFlags"].select { |f| flags.include?(f) }
-          return { matched: true, details: "LAS flags: #{found.join(", ")} (score: #{score.nil? ? "n/a" : format("%.2f", score)})" }
-        end
-        return { matched: false, details: "flags #{config["accuracyFlags"].join(", ")} not found in [#{flags.join(", ")}]" }
-      end
-
-      { matched: false, details: "no accuracy check matched in config" }
     end
 
     # ─── evaluateOfficeRule ─────────────────────────────────────────
