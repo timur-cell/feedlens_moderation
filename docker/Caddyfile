@@ -1,0 +1,6 @@
+# Caddy fronts the stack with automatic HTTPS (Let's Encrypt).
+# DOMAIN comes from the environment, e.g. feedlens.jamesedition.com
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}
