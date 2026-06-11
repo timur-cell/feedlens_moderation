@@ -1,0 +1,28 @@
+# Route FeedLens through an EXISTING Traefik on the host instead of running
+# the bundled Caddy (use this when ports 80/443 are already owned by Traefik,
+# e.g. Hostinger VPS templates). Entrypoint/resolver names match that template:
+# websecure / letsencrypt. Traefik must run with providers.docker=true.
+#
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f docker-compose.traefik.yml up -d --remove-orphans
+services:
+  db:
+    restart: unless-stopped
+
+  web:
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${DOMAIN:?set DOMAIN in .env.production}
+      APP_PORT: "443"
+
+  jobs:
+    restart: unless-stopped
+
+  frontend:
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.feedlens.rule: "Host(`${DOMAIN}`)"
+      traefik.http.routers.feedlens.entrypoints: "websecure"
+      traefik.http.routers.feedlens.tls.certresolver: "letsencrypt"
+      traefik.http.services.feedlens.loadbalancer.server.port: "80"
