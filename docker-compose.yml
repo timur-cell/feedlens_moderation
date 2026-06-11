@@ -76,7 +76,8 @@ services:
       args:
         BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
     ports:
-      - "${APP_PORT:-8080}:80"
+      # Set APP_BIND=127.0.0.1 when fronted by a TLS proxy (docker-compose.prod.yml)
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:80"
     depends_on:
       web:
         condition: service_healthy

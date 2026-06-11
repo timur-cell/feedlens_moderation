@@ -1,0 +1,41 @@
+# Production overlay: TLS termination via Caddy (automatic Let's Encrypt
+# certificates) + restart policies. Use together with .env.production:
+#
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requirements: DOMAIN's DNS A record points at this server; ports 80/443 open.
+services:
+  db:
+    restart: unless-stopped
+
+  web:
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${DOMAIN:-localhost}
+      APP_PORT: "443"
+
+  jobs:
+    restart: unless-stopped
+
+  frontend:
+    restart: unless-stopped
+
+  caddy:
+    image: ${BASE_REGISTRY:-mirror.gcr.io}/library/caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env.production}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  caddy_data:
+  caddy_config:
