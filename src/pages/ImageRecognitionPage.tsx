@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
-import { useQuery, useAction, useMutation } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import {
   Card,
   CardContent,
@@ -45,9 +45,7 @@ import {
   Building2,
   Home,
   Camera,
-  Shield,
   Droplets,
-  Star,
   ChevronDown,
   ChevronUp,
   X,
@@ -116,11 +114,22 @@ function formatPrice(price: number | undefined, currency: string | undefined) {
 // ─── Listing URL Analysis Section ───────────────────────────────
 
 function ListingUrlAnalysis() {
-  const analyzeByUrl = useAction(api.imageRecognitionActions.analyzeListingByUrl);
-  const submitToImplio = useAction(api.imageRecognitionActions.submitListingToImplio);
-  const listingAnalyses = useQuery(api.imageRecognition.listListingAnalyses) || [];
-  const deleteAnalysis = useMutation(api.imageRecognition.deleteListingAnalysis);
-  const clearAllAnalyses = useMutation(api.imageRecognition.clearAllListingAnalyses);
+  const [analyzeByUrl] = useApiMutation(
+    apiClient.imageRecognition.analyzeListingUrl,
+  );
+  const [submitToImplio] = useApiMutation(
+    apiClient.imageRecognition.submitImplio,
+  );
+  const { data: listingAnalysesData } = useApiQuery(
+    apiClient.imageRecognition.listAnalyses,
+  );
+  const listingAnalyses = listingAnalysesData || [];
+  const [deleteAnalysis] = useApiMutation(
+    apiClient.imageRecognition.deleteAnalysis,
+  );
+  const [clearAllAnalyses] = useApiMutation(
+    apiClient.imageRecognition.clearAllAnalyses,
+  );
 
   const [urlInput, setUrlInput] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -131,10 +140,15 @@ function ListingUrlAnalysis() {
   const [rejectReasonId, setRejectReasonId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const handleImplioSubmit = async (analysisId: string, action: "approve" | "reject", reason?: string) => {
+  const handleImplioSubmit = async (analysis: any, action: "approve" | "reject", reason?: string) => {
+    const analysisId = analysis._id;
     setSubmittingImplio(prev => ({ ...prev, [analysisId]: action }));
     try {
-      await submitToImplio({ analysisId: analysisId as any, action, reason });
+      await submitToImplio({
+        jeId: String(analysis.jeId),
+        outcome: action === "approve" ? "approved" : "rejected",
+        message: reason,
+      });
     } catch (e: any) {
       alert(`Failed to submit to Implio: ${e.message}`);
     } finally {
@@ -152,7 +166,7 @@ function ListingUrlAnalysis() {
     setIsAnalyzing(true);
     setError(null);
     try {
-      await analyzeByUrl({ input: urlInput.trim() });
+      await analyzeByUrl({ url: urlInput.trim() });
       setUrlInput("");
     } catch (e: any) {
       setError(e.message || "Analysis failed");
@@ -339,7 +353,7 @@ function ListingUrlAnalysis() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (confirm(`Approve listing #${analysis.jeId} in Implio?`)) {
-                                    handleImplioSubmit(analysis._id, "approve");
+                                    handleImplioSubmit(analysis, "approve");
                                   }
                                 }}
                               >
@@ -396,13 +410,13 @@ function ListingUrlAnalysis() {
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         className="flex-1 border-red-200 dark:border-red-800 bg-white dark:bg-gray-900"
-                        onKeyDown={(e) => e.key === "Enter" && handleImplioSubmit(analysis._id, "reject", rejectReason || undefined)}
+                        onKeyDown={(e) => e.key === "Enter" && handleImplioSubmit(analysis, "reject", rejectReason || undefined)}
                         autoFocus
                       />
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleImplioSubmit(analysis._id, "reject", rejectReason || undefined)}
+                        onClick={() => handleImplioSubmit(analysis, "reject", rejectReason || undefined)}
                         disabled={!!submittingImplio[analysis._id]}
                       >
                         {submittingImplio[analysis._id] === "reject" ? (
@@ -596,11 +610,17 @@ function ListingUrlAnalysis() {
 // ─── Manual Image Analysis Section ──────────────────────────────
 
 function ManualImageAnalysis() {
-  const results = useQuery(api.imageRecognition.listResults) || [];
-  const analyzeVision = useAction(api.imageRecognitionActions.analyzeWithClaude);
-  const saveResult = useMutation(api.imageRecognition.saveResult);
-  const deleteResult = useMutation(api.imageRecognition.deleteResult);
-  const clearAll = useMutation(api.imageRecognition.clearAllResults);
+  const { data: resultsData } = useApiQuery(
+    apiClient.imageRecognition.listResults,
+  );
+  const results = resultsData || [];
+  const [analyzeVision] = useApiMutation(apiClient.imageRecognition.analyze);
+  const [deleteResult] = useApiMutation(
+    apiClient.imageRecognition.deleteResult,
+  );
+  const [clearAll] = useApiMutation(
+    apiClient.imageRecognition.clearAllResults,
+  );
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
@@ -621,20 +641,14 @@ function ManualImageAnalysis() {
     setError(null);
     setPreviewResult(null);
     try {
+      // The Rails endpoint persists the result server-side, so there is no
+      // separate saveResult call; the results list refetches automatically.
       const result = await analyzeVision({
         imageUrls: urls,
-        listingTitle: titleInput || `Listing ${jeIdInput}`,
-        listingId: jeIdInput || "unknown",
+        title: titleInput || `Listing ${jeIdInput}`,
+        jeId: jeIdInput || undefined,
       });
       setPreviewResult(result);
-      await saveResult({
-        jeId: jeIdInput || "manual",
-        title: titleInput || `Listing ${jeIdInput}`,
-        imageUrls: urls,
-        llm: result.llm || "openai",
-        result,
-        analyzedAt: Date.now(),
-      });
     } catch (e: any) {
       setError(e.message || "Analysis failed");
     } finally {

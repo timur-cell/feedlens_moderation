@@ -1,4 +1,3 @@
-import { useQuery } from "convex/react";
 import { jeImageUrl } from "@/components/JeImage";
 import {
   CheckCircle2,
@@ -8,7 +7,6 @@ import {
   Bot,
   Search,
   Loader2,
-  Filter,
   RotateCcw,
   ChevronDown,
   ChevronUp,
@@ -23,18 +21,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../convex/_generated/api";
+import { useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -62,12 +54,6 @@ const aiVerdictConfig: Record<string, { label: string; icon: any; color: string;
   reject: { label: "Should Reject", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/50", border: "border-red-200 dark:border-red-800" },
   review: { label: "To Review", icon: AlertTriangle, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/50", border: "border-amber-200 dark:border-amber-800" },
   ok: { label: "Looks OK", icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/50", border: "border-emerald-200 dark:border-emerald-800" },
-};
-
-const flagSeverityColor: Record<string, string> = {
-  high: "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/50 dark:border-red-800",
-  medium: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800",
-  low: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/50 dark:border-blue-800",
 };
 
 function formatPrice(listing: any): string {
@@ -241,9 +227,9 @@ function ResultRow({ result, listing, scan }: { result: any; listing: any; scan?
         <div className="shrink-0 w-20 flex gap-1 items-center">
           <AiScanBadge scan={scan} />
           {result.visionResult && !result.visionResult?.error && (
-            <Eye className="size-4 text-blue-500" title="AI Vision analyzed" />
+            <span title="AI Vision analyzed"><Eye className="size-4 text-blue-500" /></span>
           )}
-          {result.llmTriggered ? <Bot className="size-4 text-violet-500" title="LLM triggered" /> : null}
+          {result.llmTriggered ? <span title="LLM triggered"><Bot className="size-4 text-violet-500" /></span> : null}
         </div>
 
         {/* Time */}
@@ -461,13 +447,21 @@ export default function ModerationLogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [aiScanFilter, setAiScanFilter] = useState<string>("all"); // "all", "flagged", "reject", "review", "ok"
 
-  const allResults = useQuery(api.moderation.getRecentResults, { limit: 200 });
-  const filteredResults = useQuery(api.moderation.getResultsByOutcome,
-    outcomeFilter !== "all" ? { outcome: outcomeFilter, limit: 100 } : "skip"
+  const { data: allResults } = useApiQuery(apiClient.moderation.recent, {
+    limit: 200,
+  });
+  const { data: filteredResults } = useApiQuery(
+    apiClient.moderation.byOutcome,
+    { outcome: outcomeFilter, limit: 100 },
+    { enabled: outcomeFilter !== "all" },
   );
   const results = outcomeFilter !== "all" ? filteredResults : allResults;
-  const allListings = useQuery(api.listings.listRecent, { limit: 200 });
-  const allScans = useQuery(api.aiParamScan.getRecentScans, { limit: 300 });
+  const { data: allListings } = useApiQuery(apiClient.listings.recent, {
+    limit: 200,
+  });
+  const { data: allScans } = useApiQuery(apiClient.paramScans.recent, {
+    limit: 300,
+  });
 
   const listingMap = new Map((allListings || []).map((l: any) => [l._id, l]));
   const scanMap = new Map((allScans || []).map((s: any) => [s.listingId, s]));

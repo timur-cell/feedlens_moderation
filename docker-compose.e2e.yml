@@ -1,0 +1,27 @@
+# Overlay for e2e runs in environments where www.jamesedition.com is not
+# reachable (e.g. sandboxed CI): adds a mock JE mobile API and points the
+# Rails services at it.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build
+services:
+  mock-je:
+    image: ${BASE_REGISTRY:-mirror.gcr.io}/library/node:22-alpine
+    volumes:
+      - ./scripts/e2e/mock-je-server.mjs:/srv/mock-je-server.mjs:ro
+    command: ["node", "/srv/mock-je-server.mjs", "8081"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/api/mobile/v1/listings/14250001"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    environment:
+      JE_API_BASE: http://mock-je:8081
+    depends_on:
+      mock-je:
+        condition: service_healthy
+
+  jobs:
+    environment:
+      JE_API_BASE: http://mock-je:8081

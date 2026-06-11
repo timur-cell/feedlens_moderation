@@ -1,0 +1,8 @@
+.git
+node_modules
+dist
+screenshots
+qa_results.json
+rails/log
+rails/tmp
+rails/storage

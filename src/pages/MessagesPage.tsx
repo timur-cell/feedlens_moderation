@@ -1,4 +1,3 @@
-import { useMutation, useQuery } from "convex/react";
 import {
   MessageSquare,
   XCircle,
@@ -9,7 +8,8 @@ import {
   Star,
 } from "lucide-react";
 import { useState } from "react";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,8 +98,8 @@ function TemplateEditorDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const createTemplate = useMutation(api.messages.create);
-  const updateTemplate = useMutation(api.messages.update);
+  const [createTemplate] = useApiMutation(apiClient.messages.create);
+  const [updateTemplate] = useApiMutation(apiClient.messages.update);
 
   const [displayName, setDisplayName] = useState(template?.displayName || "");
   const [category, setCategory] = useState(template?.category || "reject");
@@ -202,8 +202,8 @@ function TemplateEditorDialog({
 }
 
 export default function MessagesPage() {
-  const templates = useQuery(api.messages.list);
-  const deleteTemplate = useMutation(api.messages.remove);
+  const { data: templates } = useApiQuery(apiClient.messages.list);
+  const [deleteTemplate] = useApiMutation(apiClient.messages.remove);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [showNew, setShowNew] = useState(false);
 

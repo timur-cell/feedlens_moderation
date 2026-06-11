@@ -2,8 +2,13 @@
 # to the Rails service. Base images come from mirror.gcr.io (Docker Hub mirror).
 ARG BASE_REGISTRY=mirror.gcr.io
 
-FROM ${BASE_REGISTRY}/library/node:22-alpine AS build
+FROM ${BASE_REGISTRY}/library/node:22-bookworm-slim AS build
 WORKDIR /app
+# Trust extra CA certs (see docker/extra-ca-certs/README.md)
+COPY docker/extra-ca-certs/*.crt /tmp/extra-ca/
+RUN mkdir -p /etc/ssl/certs && (cat /tmp/extra-ca/*.crt >> /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true)
+# Node uses its own bundled CA store; point it at the system bundle too
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 COPY package.json package-lock.json ./
 RUN npm install --no-audit --no-fund
 COPY tsconfig*.json vite.config.mjs index.html components.json ./

@@ -1,6 +1,7 @@
-import { useAuthActions } from "@convex-dev/auth/react";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/apiClient";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
@@ -9,11 +10,11 @@ import { Label } from "./ui/label";
 type Step =
   | "signIn"
   | { type: "forgot"; email?: string }
-  | { type: "reset-code"; email: string }
-  | { type: "new-password"; email: string; code: string };
+  | { type: "reset-token"; email: string }
+  | { type: "new-password"; email: string; token: string };
 
 export function SignIn() {
-  const { signIn } = useAuthActions();
+  const { signIn } = useAuth();
   const [step, setStep] = useState<Step>("signIn");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,15 +31,12 @@ export function SignIn() {
 
               const formData = new FormData(e.currentTarget);
               try {
-                // Try direct credentials first (admin-created accounts)
-                await signIn("test", formData);
+                await signIn(
+                  formData.get("email") as string,
+                  formData.get("password") as string,
+                );
               } catch {
-                // Fall back to email/password provider (self-registered accounts)
-                try {
-                  await signIn("password", formData);
-                } catch {
-                  setError("Invalid email or password");
-                }
+                setError("Invalid email or password");
               } finally {
                 setLoading(false);
               }
@@ -79,7 +77,6 @@ export function SignIn() {
                 required
               />
             </div>
-            <input name="flow" value="signIn" type="hidden" />
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
                 {error}
@@ -102,7 +99,7 @@ export function SignIn() {
           <div className="text-center mb-6">
             <h2 className="font-semibold text-lg">Reset Password</h2>
             <p className="text-sm text-muted-foreground">
-              Enter your email to receive a reset code
+              Enter your email to receive a reset link
             </p>
           </div>
           <form
@@ -114,10 +111,10 @@ export function SignIn() {
               const formData = new FormData(e.currentTarget);
               const email = formData.get("email") as string;
               try {
-                await signIn("password", formData);
-                setStep({ type: "reset-code", email });
+                await apiClient.password.request({ email });
+                setStep({ type: "reset-token", email });
               } catch {
-                setError("Could not send reset code. Please try again.");
+                setError("Could not send reset email. Please try again.");
               } finally {
                 setLoading(false);
               }
@@ -137,7 +134,6 @@ export function SignIn() {
                 required
               />
             </div>
-            <input name="flow" value="reset" type="hidden" />
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
                 {error}
@@ -145,7 +141,7 @@ export function SignIn() {
             )}
             <Button type="submit" className="w-full h-11" disabled={loading}>
               {loading && <Loader2 className="size-4 animate-spin" />}
-              {loading ? "Sending..." : "Send Reset Code"}
+              {loading ? "Sending..." : "Send Reset Email"}
             </Button>
             <Button
               type="button"
@@ -162,7 +158,7 @@ export function SignIn() {
     );
   }
 
-  if (step.type === "reset-code") {
+  if (step.type === "reset-token") {
     return (
       <Card variant="elevated">
         <CardContent className="pt-6">
@@ -172,7 +168,7 @@ export function SignIn() {
             </div>
             <h2 className="font-semibold text-lg">Check your email</h2>
             <p className="text-sm text-muted-foreground">
-              We sent a code to {step.email}
+              We sent a reset token to {step.email}
             </p>
           </div>
           <form
@@ -180,20 +176,20 @@ export function SignIn() {
               e.preventDefault();
               setError("");
               const formData = new FormData(e.currentTarget);
-              const code = formData.get("code") as string;
-              setStep({ type: "new-password", email: step.email, code });
+              const token = formData.get("token") as string;
+              setStep({ type: "new-password", email: step.email, token });
             }}
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="code">Reset Code</Label>
+              <Label htmlFor="token">Reset Token</Label>
               <Input
-                id="code"
-                name="code"
+                id="token"
+                name="token"
                 type="text"
-                placeholder="Enter code"
+                placeholder="Token from the email"
                 autoComplete="one-time-code"
-                className="h-11 text-center tracking-[0.5em] font-mono"
+                className="h-11 text-center font-mono"
                 required
               />
             </div>
@@ -211,7 +207,7 @@ export function SignIn() {
               className="w-full"
               onClick={() => setStep({ type: "forgot", email: step.email })}
             >
-              Resend code
+              Resend email
             </Button>
           </form>
         </CardContent>
@@ -235,10 +231,12 @@ export function SignIn() {
             setLoading(true);
 
             const formData = new FormData(e.currentTarget);
+            const password = formData.get("newPassword") as string;
             try {
-              await signIn("password", formData);
+              await apiClient.password.reset({ token: step.token, password });
+              setStep("signIn");
             } catch {
-              setError("Could not reset password. Code may be expired.");
+              setError("Could not reset password. Token may be expired.");
               setStep({ type: "forgot", email: step.email });
             } finally {
               setLoading(false);
@@ -259,9 +257,6 @@ export function SignIn() {
               required
             />
           </div>
-          <input name="flow" value="reset-verification" type="hidden" />
-          <input name="email" value={step.email} type="hidden" />
-          <input name="code" value={step.code} type="hidden" />
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
               {error}

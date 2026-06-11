@@ -1,5 +1,5 @@
-import { useConvexAuth } from "convex/react";
 import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
@@ -42,7 +42,7 @@ function AuthFormSkeleton() {
 }
 
 export function PublicOnlyRoute() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return <AuthFormSkeleton />;

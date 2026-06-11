@@ -1,4 +1,3 @@
-import { useAction, useQuery } from "convex/react";
 import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -40,7 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { REFUSE_REASON_TYPES } from "@/lib/refuseReasons";
 
 interface RuleMatchDetail {
@@ -160,12 +160,6 @@ const aiVerdictConfig: Record<string, { bg: string; text: string; label: string 
   ok: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400", label: "OK" },
 };
 
-const severityColors: Record<string, string> = {
-  high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  low: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-};
-
 function ResultCard({ result }: { result: ModerationResult }) {
   const [expanded, setExpanded] = useState(false);
   const [scanExpanded, setScanExpanded] = useState(false);
@@ -179,12 +173,15 @@ function ResultCard({ result }: { result: ModerationResult }) {
   const hasScan = !!result.aiScan;
 
   // Query the moderation result from DB to get the result ID for overrides
-  const dbResult = useQuery(
-    api.moderation.getLatestResultByJeId,
-    result.jeId && result.status === "success" ? { jeId: result.jeId } : "skip"
+  const { data: dbResult } = useApiQuery(
+    apiClient.moderation.latestByJeId,
+    { jeId: result.jeId },
+    { enabled: !!result.jeId && result.status === "success" },
   );
-  const overrideWithImplio = useAction(api.moderation.overrideWithImplio);
-  const templates = useQuery(api.messages.list);
+  const [overrideWithImplio] = useApiMutation(
+    apiClient.moderation.overrideWithImplio,
+  );
+  const { data: templates } = useApiQuery(apiClient.messages.list);
 
   // The effective outcome (override takes priority)
   const effectiveOutcome = overrideOutcome || result.outcome;
@@ -206,12 +203,12 @@ function ResultCard({ result }: { result: ModerationResult }) {
     }
     setActionLoading(true);
     try {
+      // The override is attributed to the session moderator on the Rails side.
       await overrideWithImplio({
         resultId: dbResult._id,
         newOutcome: action,
         reason: reason || undefined,
         sellerMessage: action === "approved" ? undefined : message || undefined,
-        overriddenBy: "manual",
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
       });
       setOverrideOutcome(action);
@@ -564,7 +561,7 @@ function ResultCard({ result }: { result: ModerationResult }) {
 }
 
 export default function ModerateByIdPage() {
-  const fetchAndModerate = useAction(api.fetchListing.fetchAndModerate);
+  const [fetchAndModerate] = useApiMutation(apiClient.moderateById.run);
   const [inputText, setInputText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ModerationResponse | null>(null);

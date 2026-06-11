@@ -1,6 +1,6 @@
-import { useAuthActions } from "@convex-dev/auth/react";
 import { FlaskConical, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 
@@ -9,11 +9,10 @@ import { Separator } from "./ui/separator";
 const TEST_USER = {
   email: import.meta.env.VITE_TEST_USER_EMAIL,
   password: import.meta.env.VITE_TEST_USER_PASSWORD,
-  name: "Test Agent",
 } as const;
 
 export function TestUserLoginSection() {
-  const { signIn } = useAuthActions();
+  const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,24 +23,15 @@ export function TestUserLoginSection() {
   }
 
   const handleTestLogin = async () => {
+    const { email, password } = TEST_USER;
+    if (!email || !password) return;
     setError("");
     setLoading(true);
 
-    const formData = new FormData();
-    formData.set("email", TEST_USER.email);
-    formData.set("password", TEST_USER.password);
-    formData.set("flow", "signIn");
-
     try {
-      await signIn("test", formData);
+      await signIn(email, password);
     } catch {
-      formData.set("flow", "signUp");
-      formData.set("name", TEST_USER.name);
-      try {
-        await signIn("test", formData);
-      } catch {
-        setError("Failed to sign in as test user. Please try again.");
-      }
+      setError("Failed to sign in as test user. Please try again.");
     } finally {
       setLoading(false);
     }

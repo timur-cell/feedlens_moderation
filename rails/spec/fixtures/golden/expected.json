@@ -1,0 +1,671 @@
+[
+  {
+    "label": "baseline_approve_es",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "low_image_resolution_reject",
+    "matches": [
+      "low_image_resolution"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing images are below our minimum resolution of 500×400 pixels. Please upload higher-resolution photos and resubmit."
+  },
+  {
+    "label": "low_lqi_reject",
+    "matches": [
+      "low_lqi"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing does not meet JamesEdition's quality standards. Please improve your photos, add a detailed description, and ensure all property information is complete."
+  },
+  {
+    "label": "low_lqi_exclude_type_underscore",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "few_pictures_boundary",
+    "matches": [
+      "few_pictures"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing needs at least 2 images. Please add more photos and resubmit."
+  },
+  {
+    "label": "spain_fullname_price_reject",
+    "matches": [
+      "price_too_low_re"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing price is below the minimum threshold for JamesEdition in this market. Please verify your price or contact support if you believe this is an error."
+  },
+  {
+    "label": "algarve_region_price_reject",
+    "matches": [
+      "price_too_low_re"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing price is below the minimum threshold for JamesEdition in this market. Please verify your price or contact support if you believe this is an error."
+  },
+  {
+    "label": "uk_alias_normalization",
+    "matches": [
+      "x_uk_rule"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "UK notice."
+  },
+  {
+    "label": "es_code_vs_fullname_filter",
+    "matches": [
+      "x_country_fullname"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Country fullname notice."
+  },
+  {
+    "label": "exclude_countries_us_fullname",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "incorrectly_priced_reject",
+    "matches": [
+      "incorrectly_priced"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "The price is incorrect. Please contact JamesEdition support at support@jamesedition.com"
+  },
+  {
+    "label": "exclude_title_keyword_palace",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "max_price_boundary_inclusive",
+    "matches": [
+      "rational_bedrooms_bathrooms"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "The number of bedrooms/bathrooms appears unrealistically high and does not reflect a genuine listing. Please review before resubmitting."
+  },
+  {
+    "label": "max_price_boundary_exceeded",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "min_price_boundary_inclusive",
+    "matches": [
+      "x_min_price"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Min price notice."
+  },
+  {
+    "label": "min_price_below",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "price_field_fallback",
+    "matches": [
+      "x_min_price"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Min price notice."
+  },
+  {
+    "label": "dubai_region_type_filter",
+    "matches": [
+      "dubai_price_sqm"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "The price per square meter for your Dubai listing appears unusually low. Please verify your listing price and living area, then resubmit."
+  },
+  {
+    "label": "rental_skips_nonrental_rule",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "nonrental_low_ppsqm_reject",
+    "matches": [
+      "extremely_low_price_sqm"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "The price per square meter is unusually low for this property type and market. Please verify your listing price and living area."
+  },
+  {
+    "label": "netty_rentals_filters_only_dead",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "cgg_group_few_images",
+    "matches": [
+      "cgg_2_images"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing needs at least 3 images. Please add more photos and resubmit."
+  },
+  {
+    "label": "nystatemls_lqi_boundary",
+    "matches": [
+      "nystatemls_lqi"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing does not meet the quality standards required for this MLS feed on JamesEdition."
+  },
+  {
+    "label": "outdated_freemium_reject",
+    "matches": [
+      "outdated_freemium_under_2m"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "This listing appears to be outdated. Please update your listing information or remove stale listings from your feed."
+  },
+  {
+    "label": "outdated_paid_filters_only_dead",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "viktor_approve_short_circuit",
+    "matches": [
+      "viktor_approval"
+    ],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "viktor_reject",
+    "matches": [
+      "viktor_autoreject"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing has been rejected by our moderation team. Please contact support for more information."
+  },
+  {
+    "label": "reject_beats_manual_flag",
+    "matches": [
+      "viktor_autoreject",
+      "x_office_names"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing has been rejected by our moderation team. Please contact support for more information."
+  },
+  {
+    "label": "office_names_manual",
+    "matches": [
+      "x_office_names"
+    ],
+    "outcome": "manual",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "office_ids_reject",
+    "matches": [
+      "x_office_ids"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Office blocked."
+  },
+  {
+    "label": "commercial_title_needs_llm",
+    "matches": [
+      "commercial_properties_title",
+      "commercial_properties_23"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "commercial_properties_title",
+      "commercial_properties_23"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "commercial_excluded_by_residential",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "sold_keyword_needs_llm",
+    "matches": [
+      "sold_keywords"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "sold_keywords"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "sold_furnished_excluded",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "bad_condition_needs_llm",
+    "matches": [
+      "bad_condition_keywords"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "bad_condition_keywords"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "bad_condition_fancy_excluded",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "or_conditions_high_price",
+    "matches": [
+      "high_price_low_lqi"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "high_price_low_lqi"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "five_hundred_million_flag_llm",
+    "matches": [
+      "five_hundred_million_ads"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "five_hundred_million_ads"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "gpt_spain_multi_llm",
+    "matches": [
+      "gpt_condition_auto_spain",
+      "gpt_condition_manual_spain",
+      "gpt_conclusion_spain"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "gpt_condition_auto_spain",
+      "gpt_condition_manual_spain",
+      "gpt_conclusion_spain"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "cars_category_normalization_reject",
+    "matches": [
+      "cars_low_price"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Car listings under $5,000 are below JamesEdition's minimum threshold for the luxury automotive marketplace."
+  },
+  {
+    "label": "cars_freemium_truck_llm",
+    "matches": [
+      "cars_freemium_low_price",
+      "cars_truck_models"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "cars_freemium_low_price",
+      "cars_truck_models"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "ops_full_matrix",
+    "matches": [
+      "x_op_in",
+      "x_op_not_in",
+      "x_op_contains",
+      "x_op_not_contains",
+      "x_op_matches",
+      "x_op_empty",
+      "x_op_is_true",
+      "x_op_is_false",
+      "x_op_eq_float",
+      "x_op_neq",
+      "x_op_gte_str",
+      "x_op_is_null",
+      "x_op_require_any"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "OPS:in\nOPS:not_in\nOPS:contains\nOPS:not_contains\nOPS:matches\nOPS:empty\nOPS:is_true\nOPS:is_false\nOPS:eq_float\nOPS:neq\nOPS:gte_str\nOPS:is_null\nOPS:require_any"
+  },
+  {
+    "label": "ops_missing_fields",
+    "matches": [
+      "x_op_empty",
+      "x_op_gte_str"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "OPS:empty\nOPS:gte_str"
+  },
+  {
+    "label": "ops_feedsource_substring",
+    "matches": [
+      "x_op_in",
+      "x_op_not_in",
+      "x_op_not_contains",
+      "x_op_not_empty",
+      "x_op_is_false",
+      "x_op_neq",
+      "x_op_is_null"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "OPS:in\nOPS:not_in\nOPS:not_contains\nOPS:not_empty\nOPS:is_false\nOPS:neq\nOPS:is_null"
+  },
+  {
+    "label": "hv_scores_hit",
+    "matches": [
+      "x_hv_scores"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "HV scores reject."
+  },
+  {
+    "label": "hv_scores_miss",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "hv_watermark_keyword_reject",
+    "matches": [
+      "x_hv_watermark"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "HV watermark reject."
+  },
+  {
+    "label": "hv_watermark_size_manual",
+    "matches": [
+      "x_hv_wm_size"
+    ],
+    "outcome": "manual",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "hv_watermark_size_below",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "hv_watermark_size_default_threshold",
+    "matches": [
+      "x_hv_wm_size_default"
+    ],
+    "outcome": "manual",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "hv_unidentifiable_condition_zero",
+    "matches": [
+      "x_hv_unident"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "HV unidentifiable reject."
+  },
+  {
+    "label": "hv_skipped_without_vision_data",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "list_exact_item_substring",
+    "matches": [
+      "x_list_mixed"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Mixed list reject."
+  },
+  {
+    "label": "list_regex_item",
+    "matches": [
+      "x_list_mixed"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Mixed list reject."
+  },
+  {
+    "label": "priority_tie_stable_order",
+    "matches": [
+      "x_tie_a",
+      "x_tie_b"
+    ],
+    "outcome": "notice",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "TIE:A\nTIE:B"
+  },
+  {
+    "label": "disabled_rule_ignored",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "near_empty_listing_approves",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "eq_case_insensitive_country",
+    "matches": [
+      "russia_block"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Listings located in Russia are not currently accepted on JamesEdition."
+  },
+  {
+    "label": "title_equals_other_placeholder",
+    "matches": [
+      "title_equals_other"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Your listing title is a placeholder. Please update it with a descriptive title that reflects the property."
+  },
+  {
+    "label": "por_france_fullname",
+    "matches": [
+      "por_france"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Price on Request listings are not permitted in France due to legal requirements. Please add a price to your listing."
+  },
+  {
+    "label": "accuracy_category_disabled",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "short_description_llm",
+    "matches": [
+      "short_description"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "short_description"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "moderation_by_request_llm",
+    "matches": [
+      "moderation_by_request"
+    ],
+    "outcome": "needs_llm",
+    "needsLlm": true,
+    "llmRuleMatches": [
+      "moderation_by_request"
+    ],
+    "sellerMessage": null
+  },
+  {
+    "label": "por_price_zero_reject",
+    "matches": [
+      "por_price_zero"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Price on Request listings must include complete property details. Your listing has no price and limited information, which does not meet our listing requirements."
+  },
+  {
+    "label": "exclude_offices_number_coercion",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "duplicates_spain_reject",
+    "matches": [
+      "duplicates_within_single_account_spain"
+    ],
+    "outcome": "rejected",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": "Duplicate listings for the same property within a single account are not allowed."
+  }
+]

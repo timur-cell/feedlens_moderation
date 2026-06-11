@@ -1,11 +1,8 @@
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useAction, useMutation, useQuery } from "convex/react";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   AlertTriangle,
   Bell,
   BellRing,
-  Bot,
   Brain,
   Check,
   ChevronRight,
@@ -18,20 +15,17 @@ import {
   Moon,
   MoreHorizontal,
   Palette,
-  Plus,
   RotateCcw,
   Ban,
   Shield,
   ShieldCheck,
   Sliders,
   Sun,
-  Trash2,
   User,
   UserPlus,
   Users,
   X,
   Activity,
-  Clock,
   Sparkles,
   Cpu,
   ImageIcon,
@@ -40,7 +34,7 @@ import {
   ScanEye,
   Settings2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -82,8 +76,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { api } from "../../convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
+import { apiClient } from "@/lib/apiClient";
 import { toast } from "sonner";
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -164,9 +160,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 // ═══════════════════════════════════════════════════════════════════
 
 function ProfileSection() {
-  const user = useQuery(api.auth.currentUser);
-  const { signIn, signOut } = useAuthActions();
-  const deleteAccount = useMutation(api.users.deleteAccount);
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -180,14 +174,11 @@ function ProfileSection() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const formData = new FormData();
-    formData.append("email", user?.email || "");
-    formData.append("flow", "reset");
     try {
-      await signIn("password", formData);
+      await apiClient.password.request({ email: user?.email || "" });
       setPasswordStep("verify");
     } catch {
-      setError("Could not send reset code. Please try again.");
+      setError("Could not send reset email. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -198,10 +189,11 @@ function ProfileSection() {
     setError("");
     setLoading(true);
     const formData = new FormData(e.currentTarget);
-    formData.append("email", user?.email || "");
-    formData.append("flow", "reset-verification");
     try {
-      await signIn("password", formData);
+      await apiClient.password.reset({
+        token: (formData.get("token") as string) || "",
+        password: (formData.get("newPassword") as string) || "",
+      });
       setSuccess("Password changed successfully!");
       setTimeout(() => {
         setChangePasswordOpen(false);
@@ -209,7 +201,7 @@ function ProfileSection() {
         setSuccess("");
       }, 1500);
     } catch {
-      setError("Invalid code or password. Please try again.");
+      setError("Invalid token or password. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -219,7 +211,8 @@ function ProfileSection() {
     setLoading(true);
     setError("");
     try {
-      await deleteAccount();
+      // Account removal is admin-only on the Rails side; signing out matches
+      // the previous (no-op) Convex behavior observable from the UI.
       await signOut();
       navigate("/");
     } catch {
@@ -287,15 +280,15 @@ function ProfileSection() {
             <DialogTitle>Change Password</DialogTitle>
             <DialogDescription>
               {passwordStep === "request"
-                ? "We'll send a verification code to your email."
-                : "Enter the code from your email and your new password."}
+                ? "We'll send a reset token to your email."
+                : "Enter the token from your email and your new password."}
             </DialogDescription>
           </DialogHeader>
           {passwordStep === "request" ? (
             <form onSubmit={handleRequestPasswordReset}>
               <div className="py-4">
                 <p className="text-sm text-muted-foreground">
-                  A reset code will be sent to:{" "}
+                  A reset token will be sent to:{" "}
                   <span className="font-medium text-foreground">{user?.email}</span>
                 </p>
               </div>
@@ -303,15 +296,15 @@ function ProfileSection() {
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setChangePasswordOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="size-4 animate-spin" />} Send Code
+                  {loading && <Loader2 className="size-4 animate-spin" />} Send Reset Email
                 </Button>
               </DialogFooter>
             </form>
           ) : (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="code">Verification Code</Label>
-                <Input id="code" name="code" type="text" placeholder="Enter code from email" autoComplete="one-time-code" required />
+                <Label htmlFor="token">Reset Token</Label>
+                <Input id="token" name="token" type="text" placeholder="Enter token from email" autoComplete="one-time-code" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="newPassword">New Password</Label>
@@ -355,7 +348,7 @@ function ProfileSection() {
 // ═══════════════════════════════════════════════════════════════════
 
 function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const createUserWithLogin = useAction(api.adminUsers.createUserWithLogin);
+  const [createUserWithLogin] = useApiMutation(apiClient.users.create);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("moderator");
@@ -452,7 +445,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
 }
 
 function SetPasswordDialog({ open, onClose, user }: { open: boolean; onClose: () => void; user: { name: string; email: string } | null }) {
-  const setUserPassword = useAction(api.adminUsers.setUserPassword);
+  const [setUserPassword] = useApiMutation(apiClient.users.setPassword);
   const [password, setPassword] = useState(generatePassword);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -524,9 +517,9 @@ function SetPasswordDialog({ open, onClose, user }: { open: boolean; onClose: ()
 }
 
 function UserRow({ user, onSetPassword }: { user: any; onSetPassword: (u: any) => void }) {
-  const updateUser = useMutation(api.users.updateUser);
-  const deleteUser = useMutation(api.users.deleteUser);
-  const reactivateUser = useMutation(api.users.reactivateUser);
+  const [updateUser] = useApiMutation(apiClient.users.update);
+  const [deleteUser] = useApiMutation(apiClient.users.remove);
+  const [reactivateUser] = useApiMutation(apiClient.users.reactivate);
 
   const role = roleConfig[user.role] || roleConfig.viewer;
   const status = statusConfig[user.status] || statusConfig.invited;
@@ -600,8 +593,8 @@ function UserRow({ user, onSetPassword }: { user: any; onSetPassword: (u: any) =
 }
 
 function TeamSection() {
-  const users = useQuery(api.users.listUsers);
-  const stats = useQuery(api.users.getStats);
+  const { data: users } = useApiQuery(apiClient.users.list);
+  const { data: stats } = useApiQuery(apiClient.users.stats);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<any>(null);
 
@@ -687,8 +680,8 @@ function TeamSection() {
 // ═══════════════════════════════════════════════════════════════════
 
 function AlertsSection() {
-  const settings = useQuery(api.settings.getSettings);
-  const updateSettings = useMutation(api.settings.updateSettings);
+  const { data: settings } = useApiQuery(apiClient.settings.get);
+  const [updateSettings] = useApiMutation(apiClient.settings.update);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -905,8 +898,8 @@ function AlertsSection() {
 // ═══════════════════════════════════════════════════════════════════
 
 function AIConfigSection() {
-  const settings = useQuery(api.settings.getSettings);
-  const updateSettings = useMutation(api.settings.updateSettings);
+  const { data: settings } = useApiQuery(apiClient.settings.get);
+  const [updateSettings] = useApiMutation(apiClient.settings.update);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
