@@ -1,6 +1,7 @@
 require "net/http"
 require "json"
 require "base64"
+require "ipaddr"
 
 module Ai
   # Port of convex/imageRecognitionActions.ts: Claude vision analysis of
@@ -99,6 +100,12 @@ module Ai
     TYPE_PREFIX_RE = /\A(House|Apartment|Villa|Penthouse|Land|Estate|Condo|Office|Studio|Townhouse|Other|Plot|Chalet|Castle|Farm|Mansion|Duplex|Loft|Bungalow|Cottage|Ranch)\s+in\s+/i
 
     IMAGE_FETCH_TIMEOUT = 15
+
+    # Image URLs come from seller feeds: only fetch public http(s) hosts and
+    # cap the body so a hostile URL can neither reach internal services (SSRF)
+    # nor exhaust worker memory.
+    MAX_IMAGE_BYTES = 20 * 1024 * 1024
+    BLOCKED_HOST_SUFFIXES = %w[.local .internal .localdomain].freeze
     LISTING_BATCH_SIZE = 5
 
     class << self
@@ -265,12 +272,25 @@ module Ai
         results = []
         urls.first(max_images).each do |url|
           begin
+            unless safe_image_url?(url)
+              Rails.logger.warn("Blocked unsafe image URL (scheme/host): #{url}")
+              next
+            end
             response = http_get(url, timeout: IMAGE_FETCH_TIMEOUT)
             unless response.is_a?(Net::HTTPSuccess)
               Rails.logger.info("Image fetch failed: #{response.code} #{url}")
               next
             end
+            declared = response["content-length"].to_i
+            if declared > MAX_IMAGE_BYTES
+              Rails.logger.info("Skipping oversized image (declared #{declared} bytes): #{url}")
+              next
+            end
             body = response.body.to_s
+            if body.bytesize > MAX_IMAGE_BYTES
+              Rails.logger.info("Skipping oversized image (#{body.bytesize} bytes): #{url}")
+              next
+            end
             # Detect actual image type from magic bytes (don't trust the
             # content-type header — JE CDN often mislabels PNGs as JPEG).
             media_type = detect_image_type(body)
@@ -509,6 +529,30 @@ module Ai
       def js_parse_float(value)
         s = value.to_s.strip[/\A[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/]
         s&.to_f
+      end
+
+      # Allow only public http(s) URLs: no localhost/.local hosts and no
+      # literal loopback/private/link-local IPs (cloud metadata, internal
+      # services). Hostname-based DNS rebinding is out of scope here — the
+      # fetch runs from a worker with no privileged network position.
+      def safe_image_url?(url)
+        uri = URI(url)
+        return false unless uri.is_a?(URI::HTTP) # URI::HTTPS subclasses URI::HTTP
+
+        host = uri.host.to_s.downcase
+        return false if host.empty? || host == "localhost"
+        return false if BLOCKED_HOST_SUFFIXES.any? { |suffix| host.end_with?(suffix) }
+
+        ip = begin
+          IPAddr.new(host)
+        rescue IPAddr::InvalidAddressError
+          nil
+        end
+        return false if ip && (ip.loopback? || ip.private? || ip.link_local?)
+
+        true
+      rescue URI::InvalidURIError
+        false
       end
 
       def http_get(url, timeout:)
