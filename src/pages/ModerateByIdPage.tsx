@@ -18,6 +18,8 @@ import {
   ChevronUp,
   ScanLine,
   MessageSquare,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +84,7 @@ interface ModerationResult {
   error?: string;
   status: string;
   dataSource?: string;
+  locked?: boolean;
   aiScan?: AiScanResult;
 }
 
@@ -169,6 +172,8 @@ function ResultCard({ result }: { result: ModerationResult }) {
   const [refuseReasonType, setRefuseReasonType] = useState("other");
   const [actionLoading, setActionLoading] = useState(false);
   const [overrideOutcome, setOverrideOutcome] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
   const hasRuleDetails = (result.ruleMatchDetails?.length ?? 0) > 0;
   const hasScan = !!result.aiScan;
 
@@ -181,7 +186,27 @@ function ResultCard({ result }: { result: ModerationResult }) {
   const [overrideWithImplio] = useApiMutation(
     apiClient.moderation.overrideWithImplio,
   );
+  const [unlockListing] = useApiMutation(apiClient.listings.unlock);
   const { data: templates } = useApiQuery(apiClient.messages.list);
+
+  const isLocked = !!result.locked && !unlocked;
+
+  const handleUnlock = async () => {
+    if (!result.listingId) {
+      toast.error("Listing id is missing — cannot unlock");
+      return;
+    }
+    setUnlockLoading(true);
+    try {
+      await unlockListing({ listingId: result.listingId });
+      setUnlocked(true);
+      toast.success("Listing unlocked — run moderation again to re-evaluate it");
+    } catch (err) {
+      toast.error(`Failed to unlock: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setUnlockLoading(false);
+    }
+  };
 
   // The effective outcome (override takes priority)
   const effectiveOutcome = overrideOutcome || result.outcome;
@@ -262,6 +287,31 @@ function ResultCard({ result }: { result: ModerationResult }) {
                 <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-[10px]">
                   Manually overridden
                 </Badge>
+              )}
+              {isLocked && (
+                <Badge className="bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 text-[10px]">
+                  <Lock className="size-3 mr-1" />
+                  Locked — final decision
+                </Badge>
+              )}
+              {unlocked && (
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]">
+                  <Unlock className="size-3 mr-1" />
+                  Unlocked
+                </Badge>
+              )}
+              {isLocked && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs"
+                  disabled={unlockLoading}
+                  title="Release the final decision so this listing can be re-moderated"
+                  onClick={handleUnlock}
+                >
+                  {unlockLoading ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Unlock className="size-3 mr-1" />}
+                  Unlock
+                </Button>
               )}
               <DataSourceBadge source={result.dataSource} />
             </div>

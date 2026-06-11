@@ -177,6 +177,8 @@ export const apiClient = {
     recent: (args?: { limit?: number }) =>
       request<any[]>("GET", "/api/listings/recent", { params: args }),
     stats: () => request<any>("GET", "/api/listings/stats"),
+    unlock: ({ listingId }: { listingId: string }) =>
+      request<any>("POST", `/api/listings/${listingId}/unlock`),
   },
 
   moderation: {
