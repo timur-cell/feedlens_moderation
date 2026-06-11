@@ -71,8 +71,17 @@ original TypeScript implementation — see `../scripts/golden/README.md` to rege
 
 ## Importing production data
 
-See `HANDOFF.md` at the repo root: `bin/rails convex:import[path/to/export.zip]` ingests a
-`npx convex export` ZIP.
+```bash
+bin/rails "convex:import[path/to/export.zip]"    # or an extracted directory
+```
+
+Accepts both Convex export layouts: `<table>/documents.jsonl` (`npx convex export`) and flat
+`<table>.jsonl` (the production bot's format). Upserts by natural keys, remaps Convex `_id`
+references, idempotent on re-run. Verified against the real production export — see
+`HANDOFF.md` for details and the moderator-password caveat.
+
+In the compose stack: `docker compose cp export.zip web:/tmp/ && docker compose exec web
+bin/rails "convex:import[/tmp/export.zip]"`.
 
 ## End-to-end (Playwright)
 

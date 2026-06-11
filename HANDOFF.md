@@ -31,12 +31,24 @@ The Rails 8 app in `rails/` replaces the Convex backend (`convex/`, frozen on br
 bin/rails "convex:import[/path/to/export.zip]"   # or an extracted directory
 ```
 
-(`lib/tasks/convex_import.rake`.) It maps camelCase docs to the snake_case tables, remaps
-Convex `_id` references (`listingId`, `moderatorId`) to the new integer FKs (falling back to
-`je_id` lookup), upserts on natural keys (je_id / name / email / date), and preserves
-`_creationTime`. **Moderator passwords are not imported** — Convex stores Scrypt hashes that
-Devise/bcrypt cannot verify. Imported moderators get a random password; set real ones via the
-Users page (admin) or Devise password reset (needs SMTP).
+(`lib/tasks/convex_import.rake`.) Both export layouts are supported (`<table>/documents.jsonl`
+from `npx convex export`, and flat `<table>.jsonl` as produced by the production bot). It maps
+camelCase docs to the snake_case tables, remaps Convex `_id` references (`listingId`,
+`moderatorId`) to the new integer FKs (falling back to `je_id` lookup), upserts on natural keys
+(composite keys for history tables, so re-runs are idempotent), and preserves `_creationTime`.
+
+**Verified against the real production export** (June 2026, from Viktor's bot): 67 listings,
+75 moderation results (all FKs remapped), 82 rules after merge, 6 moderators, 52 param scans,
+5 vision results, 6 activity rows — zero errors, zero dropped fields, idempotent second run.
+Import semantics are a **merge**: prod rows win on natural-key conflicts (4 live-edited rule
+configs — e.g. `extremely_low_price_sqm` excluding US/AE — and the prod-only
+`hundred_million_ads` rule are preserved), while seed-only rows remain (the 4 newer
+`duplicates_within_single_account_*` / `five_hundred_million_ads` rules). The export ZIP itself
+is deliberately NOT committed to the repo — it contains the team's emails and production data.
+
+**Moderator passwords are not imported** — Convex stores Scrypt hashes that Devise/bcrypt
+cannot verify (and the export doesn't include them anyway). Imported moderators get a random
+password; set real ones via the Users page (admin) or Devise password reset (needs SMTP).
 
 ## Intentionally NOT migrated (and replacements)
 

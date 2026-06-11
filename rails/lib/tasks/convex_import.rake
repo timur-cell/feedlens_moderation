@@ -59,9 +59,19 @@ class ConvexImporter
     "Setting" => { "updatedAt" => "updated_at_ms" }
   }.freeze
 
+  # Natural keys used to upsert (and keep re-runs idempotent). History tables
+  # without a single natural key use composite keys; Convex _ids are not stored.
   UNIQUE_KEYS = {
-    "Listing" => :je_id, "Rule" => :name, "ModerationList" => :name,
-    "MessageTemplate" => :name, "Moderator" => :email, "DailyStat" => :date, "Setting" => :key
+    "Listing" => [ :je_id ], "Rule" => [ :name ], "ModerationList" => [ :name ],
+    "MessageTemplate" => [ :name ], "Moderator" => [ :email ], "DailyStat" => [ :date ],
+    "Setting" => [ :key ],
+    "ModerationResult" => [ :je_id, :processed_at ],
+    "ModeratorActivity" => [ :moderator_name, :action, :timestamp ],
+    "AiParameterScan" => [ :je_id, :scanned_at ],
+    "ImageRecognitionResult" => [ :je_id, :analyzed_at ],
+    "ListingImageAnalysis" => [ :je_id, :analyzed_at ],
+    "ModerationNote" => [ :je_id, :created_at_ms ],
+    "RemediationResult" => [ :je_id, :scanned_at ]
   }.freeze
 
   def initialize(dir)
@@ -83,9 +93,13 @@ class ConvexImporter
 
   private
 
+  # Convex exports come in two layouts depending on the tool/version:
+  # <table>/documents.jsonl (npx convex export) or flat <table>.jsonl.
   def documents_file(convex_table)
     [ File.join(@dir, convex_table, "documents.jsonl"),
-      Dir.glob(File.join(@dir, "**", convex_table, "documents.jsonl")).first ].compact.find { |f| File.exist?(f) }
+      File.join(@dir, "#{convex_table}.jsonl"),
+      Dir.glob(File.join(@dir, "**", convex_table, "documents.jsonl")).first,
+      Dir.glob(File.join(@dir, "**", "#{convex_table}.jsonl")).first ].compact.find { |f| File.exist?(f) }
   end
 
   def import_table(convex_table, model, file)
@@ -96,8 +110,9 @@ class ConvexImporter
 
       doc = JSON.parse(line)
       record = build_record(model, doc)
-      record.new_record? ? created += 1 : updated += 1
+      was_new = record.new_record?
       record.save!
+      was_new ? created += 1 : updated += 1
       @id_maps[convex_table][doc["_id"]] = record.id if doc["_id"]
     rescue StandardError => e
       errors += 1
@@ -108,8 +123,13 @@ class ConvexImporter
 
   def build_record(model, doc)
     attrs = transform(model, doc)
-    key = UNIQUE_KEYS[model.name]
-    record = key && attrs[key.to_s].present? ? model.find_or_initialize_by(key => attrs[key.to_s]) : model.new
+    keys = UNIQUE_KEYS[model.name]
+    record =
+      if keys && keys.all? { |k| attrs.key?(k.to_s) && !attrs[k.to_s].nil? }
+        model.find_or_initialize_by(keys.index_with { |k| attrs[k.to_s] })
+      else
+        model.new
+      end
     attrs.each { |k, v| record[k] = v }
     record.created_at ||= Time.zone.at(doc["_creationTime"].to_f / 1000.0) if doc["_creationTime"]
     if model.name == "Moderator" && record.new_record? && record.encrypted_password.blank?
