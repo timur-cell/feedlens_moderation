@@ -31,6 +31,7 @@ Rails.application.routes.draw do
     get "listings", to: "listings#index"
     get "listings/:id", to: "listings#show"
     post "listings/:id/moderate", to: "listings#moderate"
+    post "listings/:id/unlock", to: "listings#unlock"
     post "listings/:id/param-scan", to: "param_scans#create"
     get "listings/:listing_id/notes", to: "notes#index"
     post "listings/:listing_id/notes", to: "notes#create"

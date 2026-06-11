@@ -148,6 +148,23 @@ module Listings
           return { jeId: trimmed, input: trimmed, error: "Invalid listing ID", status: "error" }
         end
 
+        # A locked listing carries a final human decision: skip the re-import
+        # (which would reset moderation_status to pending) and the re-moderation
+        # entirely.
+        locked = Listing.find_by(je_id: je_id, moderation_locked: true)
+        if locked
+          return {
+            jeId: je_id,
+            input: trimmed,
+            listingId: locked.id,
+            title: locked.title,
+            outcome: locked.moderation_status,
+            locked: true,
+            status: "skipped",
+            error: "Listing decision is locked by #{locked.moderation_locked_by.presence || 'a moderator'} — unlock it to re-moderate"
+          }
+        end
+
         # Fetch listing data with cascading sources
         fetched = JeClient.fetch_listing(je_id, url: url)
         data = fetched&.dig(:data) || minimal_listing_data(je_id, url)

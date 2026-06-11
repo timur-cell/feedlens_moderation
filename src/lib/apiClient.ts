@@ -211,6 +211,7 @@ export const apiClient = {
       reason?: string;
       sellerMessage?: string;
       refuseReasonType?: string;
+      permanent?: boolean;
     }) =>
       request<any>("POST", `/api/moderation-results/${resultId}/override`, {
         body,
@@ -224,6 +225,7 @@ export const apiClient = {
       reason?: string;
       sellerMessage?: string;
       refuseReasonType?: string;
+      permanent?: boolean;
     }) =>
       request<any>(
         "POST",

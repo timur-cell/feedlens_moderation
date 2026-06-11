@@ -9,6 +9,19 @@ module Moderation
 
     class << self
       def call(listing, moderator: nil)
+        # A locked listing carries a final human decision — automated
+        # re-moderation must never change or shadow it.
+        if listing.moderation_locked?
+          return {
+            outcome: listing.moderation_status,
+            skipped: "locked",
+            ruleMatches: [],
+            llmTriggered: false,
+            confidence: nil,
+            visionAnalyzed: false
+          }
+        end
+
         settings = Setting.current
 
         # 0. AI Parameter Scan. Failure is non-blocking — the scan doesn't

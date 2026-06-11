@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_10_000014) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_11_205617) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -126,6 +126,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_000014) do
     t.string "listing_url"
     t.float "living_area"
     t.float "lqi"
+    t.boolean "moderation_locked", default: false, null: false
+    t.bigint "moderation_locked_at"
+    t.string "moderation_locked_by"
     t.string "moderation_status", null: false
     t.string "office"
     t.string "office_group_name"
@@ -148,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_000014) do
     t.index ["feed_source"], name: "index_listings_on_feed_source"
     t.index ["imported_at"], name: "index_listings_on_imported_at"
     t.index ["je_id"], name: "index_listings_on_je_id", unique: true
+    t.index ["moderation_locked"], name: "index_listings_on_moderation_locked"
     t.index ["moderation_status"], name: "index_listings_on_moderation_status"
   end
 

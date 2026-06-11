@@ -106,7 +106,10 @@ module Api
       }.compact
 
       if existing
-        existing.update!(accuracy_patch.merge(moderation_status: "manual"))
+        # A locked listing carries a final human decision — keep recording the
+        # accuracy payload but never flip its status back to the manual queue.
+        patch = existing.moderation_locked? ? accuracy_patch : accuracy_patch.merge(moderation_status: "manual")
+        existing.update!(patch)
         results[:updated] += 1
       else
         listing = Listing.create!(

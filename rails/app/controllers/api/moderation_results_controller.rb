@@ -88,13 +88,24 @@ module Api
       patch[:refuse_reason_type] = params[:refuseReasonType] if params[:refuseReasonType].present?
       result.update!(patch)
 
-      result.listing.update!(moderation_status: new_outcome)
+      listing_patch = { moderation_status: new_outcome }
+      # permanent: true makes the human decision final — the listing is locked
+      # against any automated re-moderation until explicitly unlocked.
+      if ActiveModel::Type::Boolean.new.cast(params[:permanent])
+        listing_patch.merge!(
+          moderation_locked: true,
+          moderation_locked_at: now_ms,
+          moderation_locked_by: current_moderator.name.presence || current_moderator.email
+        )
+      end
+      result.listing.update!(listing_patch)
 
       log_activity(
         action: "override_decision",
         target_type: "moderationResult",
         target_id: result.id.to_s,
         details: "Overrode #{result.original_outcome} → #{new_outcome} for listing #{result.je_id}" \
+                 "#{listing_patch[:moderation_locked] ? ' (locked permanently)' : ''}" \
                  "#{params[:reason].present? ? ". Reason: #{params[:reason]}" : ''}"
       )
     end

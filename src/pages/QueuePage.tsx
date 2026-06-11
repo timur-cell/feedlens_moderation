@@ -27,6 +27,7 @@ import {
   StickyNote,
   Send,
   Trash2,
+  Lock,
   // ShieldAlert, Activity — removed with LAS UI (hidden 2026-03-17)
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -44,6 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -464,6 +466,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
   const [message, setMessage] = useState("");
   const [reason, setReason] = useState("");
   const [refuseReasonType, setRefuseReasonType] = useState("other");
+  const [permanent, setPermanent] = useState(false);
   const [dismissedRules, setDismissedRules] = useState<Set<string>>(new Set());
   const { data: results } = useApiQuery(apiClient.moderation.forListing, {
     listingId: listing._id,
@@ -490,13 +493,18 @@ function ListingCard({ listing }: { listing: QueueListing }) {
     setMessage("");
     setReason("");
     setRefuseReasonType("other");
+    setPermanent(false);
   };
 
-  const handleAction = async (action: "approved" | "rejected" | "notice") => {
+  const handleAction = async (
+    action: "approved" | "rejected" | "notice",
+    opts?: { permanent?: boolean },
+  ) => {
     if (!result) {
       toast.error("No moderation result found for this listing");
       return;
     }
+    const lockForever = opts?.permanent ?? permanent;
     setActionLoading(true);
     try {
       // Use overrideWithImplio that also submits to Implio; the override is
@@ -507,8 +515,11 @@ function ListingCard({ listing }: { listing: QueueListing }) {
         reason: reason || undefined,
         sellerMessage: action === "approved" ? undefined : message || undefined,
         refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
+        permanent: lockForever || undefined,
       });
-      toast.success(`Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"} — synced to Implio`);
+      toast.success(
+        `Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"}${lockForever ? " permanently (locked)" : ""} — synced to Implio`,
+      );
       closeActionDialog();
     } catch (err) {
       console.error("Override failed:", err);
@@ -800,6 +811,17 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                     {actionLoading ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="size-3.5 mr-1" />}
                     Approve
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                    disabled={actionLoading}
+                    title="Approve and lock — automated re-moderation will never change this decision"
+                    onClick={() => handleAction("approved", { permanent: true })}
+                  >
+                    <Lock className="size-3.5 mr-1" />
+                    Approve forever
+                  </Button>
                 </div>
               </div>
             </div>
@@ -896,6 +918,23 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                 className="mt-1"
               />
             </div>
+
+            <label className="flex items-start gap-2 rounded-md border p-3 cursor-pointer">
+              <Checkbox
+                checked={permanent}
+                onCheckedChange={(v) => setPermanent(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                <span className="font-medium flex items-center gap-1">
+                  <Lock className="size-3.5" /> Final decision
+                </span>
+                <span className="text-muted-foreground">
+                  Lock this listing — feed re-imports and automated re-moderation
+                  will never change it until a moderator unlocks it.
+                </span>
+              </span>
+            </label>
           </div>
 
           <DialogFooter>
