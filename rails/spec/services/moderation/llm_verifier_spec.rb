@@ -41,14 +41,14 @@ RSpec.describe Moderation::LlmVerifier do
 
   around { |example| with_env("ANTHROPIC_API_KEY" => "test-key") { example.run } }
 
-  it "sends the verification prompt with max_tokens 500 and the configured model/temperature" do
+  it "sends the verification prompt with max_tokens 1000 and the configured model/temperature" do
     claude_stub = stub_request(:post, anthropic_url)
       .with(headers: { "x-api-key" => "test-key", "anthropic-version" => "2023-06-01" }) do |req|
         body = JSON.parse(req.body)
         prompt = body.dig("messages", 0, "content")
 
         body["model"] == "claude-verifier" &&
-          body["max_tokens"] == 500 &&
+          body["max_tokens"] == 1000 &&
           body["temperature"] == 0.1 &&
           prompt.include?("FLAGGED RULES TO VERIFY:") &&
           prompt.include?("• [auto_ai] commercial_property (action: reject): matched 'commercial'") &&
