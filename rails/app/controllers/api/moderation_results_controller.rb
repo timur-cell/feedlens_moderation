@@ -86,7 +86,6 @@ module Api
         seller_message: params[:sellerMessage].presence || result.seller_message
       }
       patch[:refuse_reason_type] = params[:refuseReasonType] if params[:refuseReasonType].present?
-      result.update!(patch)
 
       listing_patch = { moderation_status: new_outcome }
       # permanent: true makes the human decision final — the listing is locked
@@ -98,7 +97,14 @@ module Api
           moderation_locked_by: current_moderator.name.presence || current_moderator.email
         )
       end
-      result.listing.update!(listing_patch)
+
+      # The override and the listing status must change together — a failure
+      # between the two writes would leave an overridden result whose listing
+      # still shows the machine outcome.
+      ActiveRecord::Base.transaction do
+        result.update!(patch)
+        result.listing.update!(listing_patch)
+      end
 
       log_activity(
         action: "override_decision",
