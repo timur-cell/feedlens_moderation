@@ -27,7 +27,8 @@ The Rails 8 app in `rails/` replaces the Convex backend (`convex/`, frozen on br
 ## BigQuery listing sync
 
 `BqListingSyncJob` (recurring.yml, daily 06:00 UTC) pulls newly created active
-RealEstate/Car listings from `data_marts` in BigQuery via `Listings::BqSync`,
+RealEstate/Car listings (initial scope: ES/PT — `Listings::BqSync::COUNTRIES`)
+from `data_marts` in BigQuery via `Listings::BqSync`,
 watermarked on `listing_created_at` (`sync_states` row `bq_listings`,
 bootstrapped to first-run time — no backfill). Each new listing runs through
 `Moderation::Runner` with `param_scan: false` (no per-listing Claude call;

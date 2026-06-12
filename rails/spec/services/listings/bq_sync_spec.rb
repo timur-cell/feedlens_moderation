@@ -44,6 +44,10 @@ RSpec.describe Listings::BqSync do
     allow(Integrations::BigqueryClient).to receive(:query).and_return(rows)
   end
 
+  it "limits the batch to the initial country scope" do
+    expect(described_class::SQL).to include("l.country_code IN ('ES', 'PT')")
+  end
+
   it "no-ops when BigQuery credentials are not configured" do
     allow(Integrations::BigqueryClient).to receive(:configured?).and_return(false)
 

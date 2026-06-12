@@ -7,7 +7,11 @@ module Listings
   # which also makes re-runs after a mid-batch failure idempotent.
   class BqSync
     WATERMARK_KEY = "bq_listings".freeze
-    MAX_LISTINGS_PER_RUN = 10_000 # daily new-listing volume is ~7,400
+    MAX_LISTINGS_PER_RUN = 10_000 # daily new-listing volume is ~7,400 worldwide
+    # Initial rollout scope — widen once volume/cost look good. Listings
+    # created outside the scope are not backfilled when it widens (the
+    # watermark will already have passed them).
+    COUNTRIES = %w[ES PT].freeze
 
     SQL = <<~SQL.freeze
       WITH batch AS (
@@ -22,6 +26,7 @@ module Listings
           AND l.listing_deleted_at IS NULL
           AND l.draft IS NOT TRUE
           AND l.type IN ('Listing::RealEstateListing', 'Listing::CarListing')
+          AND l.country_code IN (#{COUNTRIES.map { |c| "'#{c}'" }.join(", ")})
           AND l.listing_created_at > @watermark
         ORDER BY l.listing_created_at
         LIMIT #{MAX_LISTINGS_PER_RUN}
