@@ -1,50 +1,46 @@
-import { jeImageUrl } from "@/components/JeImage";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CheckCircle2,
-  XCircle,
-  MessageSquare,
+  Search,
+  RefreshCw,
+  Keyboard,
+  Maximize2,
+  Copy,
   ExternalLink,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
+  StickyNote,
+  History as HistoryIcon,
   Inbox,
-  Image,
-  MapPin,
-  DollarSign,
-  Building,
-  Bot,
-  Bed,
-  Bath,
-  Ruler,
-  LandPlot,
-  Tag,
-  FileText,
+  Loader2,
   ChevronLeft,
   ChevronRight,
-  Maximize2,
-  Clock,
   X,
-  StickyNote,
-  Send,
-  Trash2,
-  Lock,
-  // ShieldAlert, Activity — removed with LAS UI (hidden 2026-03-17)
+  Check,
+  Ban,
+  MessageSquare,
+  SkipForward,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { jeImageUrl } from "@/components/JeImage";
 import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useQueueKeyboard } from "@/hooks/useQueueKeyboard";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+  AgeChip,
+  Kbd,
+  OpsThumb,
+  RuleChip,
+  SectionLabel,
+  StatusChip,
+} from "@/components/ops";
+import {
+  actionLabel,
+  formatLocation,
+  formatLocationOffice,
+  formatPrice,
+} from "@/lib/queueFormat";
+import { REFUSE_REASON_TYPES } from "@/lib/refuseReasons";
+import { WhyFlagged, ListingFacts, evidenceFromResult } from "@/components/queue/EvidencePanel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -53,954 +49,1060 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
-import { REFUSE_REASON_TYPES } from "@/lib/refuseReasons";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ModerationNotes } from "@/components/queue/ModerationNotes";
 
-interface QueueListing {
-  _id: string;
-  jeId: string;
-  title: string;
-  price?: number;
-  priceUsd?: number;
-  currency?: string;
-  priceOnRequest?: boolean;
-  country?: string;
-  city?: string;
-  state?: string;
-  category?: string;
-  realEstateType?: string;
-  imageCount?: number;
-  imageUrls?: string[];
-  avgImageWidth?: number;
-  avgImageHeight?: number;
-  lqi?: number;
-  description?: string;
-  descriptionLength?: number;
-  office?: string;
-  officeGroupName?: string;
-  officeSubscription?: string;
-  livingArea?: number;
-  landArea?: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  feedSource?: string;
-  listingUrl?: string;
-  importedAt: number;
-  rental?: boolean;
-  preOwned?: boolean;
-  outdated?: boolean;
-  year?: number;
-  chatGptConclusion?: string;
-  chatGptPropertyCondition?: number;
-  chatGptWatermarkShare?: number;
-  chatGptImageQuality?: string;
-  // LAS accuracy data
-  accuracyScore?: number;
-  accuracyLabel?: string;
-  accuracyFlags?: string[];
-  accuracyReview?: string;
-  accuracyUserMessage?: string;
-  accuracyAction?: string;
-  accuracyScannedAt?: number;
-  pricePerSqm?: number;
-}
+type Listing = any;
+type Result = any;
 
-/* ─── Time Waiting Counter ────────────────────────────────────── */
-function TimeWaiting({ since }: { since: number }) {
-  const [elapsed, setElapsed] = useState("");
+// Override-feedback loop: every human override records *why* it disagreed with
+// automation. These roll up (server-side) into per-rule precision.
+const OVERRIDE_REASONS = [
+  { value: "false_positive", label: "False positive" },
+  { value: "policy_changed", label: "Policy changed" },
+  { value: "edge_case", label: "Edge case" },
+  { value: "other", label: "Other" },
+];
 
-  useEffect(() => {
-    const update = () => {
-      const diff = Date.now() - since;
-      const secs = Math.floor(diff / 1000);
-      const mins = Math.floor(secs / 60);
-      const hours = Math.floor(mins / 60);
-      const days = Math.floor(hours / 24);
+const DENSITY_KEY = "feedlens.queue.density";
 
-      if (days > 0) {
-        setElapsed(`${days}d ${hours % 24}h`);
-      } else if (hours > 0) {
-        setElapsed(`${hours}h ${mins % 60}m`);
-      } else if (mins > 0) {
-        setElapsed(`${mins}m ${secs % 60}s`);
-      } else {
-        setElapsed(`${secs}s`);
-      }
-    };
-
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [since]);
-
+/* ─── Toolbar facet (label · value ▾) ───────────────────────────── */
+function Facet({
+  label,
+  value,
+  active,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  active?: boolean;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
   return (
-    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-full text-xs font-medium text-amber-700 dark:text-amber-300">
-      <Clock className="size-3 animate-pulse" />
-      <span>Waiting: {elapsed}</span>
-    </div>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        size="sm"
+        className={`h-[30px]! w-auto gap-1.5 rounded-none border-border px-2.5 text-[12px] ${
+          active ? "border-je-teal bg-je-teal-bg text-je-teal" : ""
+        }`}
+      >
+        <span className="text-je-ink-2">{label}</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="rounded-none">
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} className="rounded-none text-[12px]">
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
-/* ─── Dismissable Rule Pills ──────────────────────────────────── */
-function DismissableRulePills({
-  ruleMatches,
-  dismissedRules,
-  onDismiss,
-}: {
-  ruleMatches: Array<{ ruleName: string; ruleCategory: string; action: string; details?: string; message?: string }>;
-  dismissedRules: Set<string>;
-  onDismiss: (ruleName: string) => void;
-}) {
-  const visibleRules = ruleMatches.filter((m) => !dismissedRules.has(m.ruleName));
 
-  if (visibleRules.length === 0 && ruleMatches.length > 0) {
-    return (
-      <div className="text-xs text-muted-foreground italic py-1">
-        All {ruleMatches.length} rule alerts dismissed
-      </div>
-    );
-  }
-
-  if (visibleRules.length === 0) return null;
-
+/* ─── Media strip ───────────────────────────────────────────────── */
+function MediaStrip({ images, onFocus }: { images: string[]; onFocus: () => void }) {
+  const shown = images.slice(0, 8);
+  const remaining = images.length - shown.length;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {visibleRules.map((m, i) => (
-        <div
-          key={i}
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition-all ${
-            m.action === "reject"
-              ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
-              : m.action === "flag"
-                ? "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                : "bg-sky-50 dark:bg-sky-950 border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300"
-          }`}
-        >
-          {m.ruleCategory === "llm" && <Bot className="size-3" />}
-          <span>{m.ruleName}</span>
-          {m.details && (
-            <span className="opacity-60 max-w-[200px] truncate" title={m.details}>
-              — {m.details}
-            </span>
-          )}
+    <div>
+      <SectionLabel className="mb-1.5">
+        Media · {images.length} image{images.length === 1 ? "" : "s"}
+        <span className="ml-1 font-normal normal-case tracking-normal text-je-ink-3">
+          · open focus mode <Kbd>F</Kbd>
+        </span>
+      </SectionLabel>
+      <div className="flex flex-wrap gap-1.5">
+        {shown.map((url, i) => (
+          <button type="button" key={i} onClick={onFocus} title="Open focus mode">
+            <OpsThumb src={jeImageUrl(url)} width={76} height={57} />
+          </button>
+        ))}
+        {remaining > 0 && (
           <button
             type="button"
-            className="ml-0.5 p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDismiss(m.ruleName);
-            }}
-            title="Dismiss this alert"
+            onClick={onFocus}
+            className="flex h-[57px] w-[76px] items-center justify-center border border-border bg-je-surface text-[12px] text-je-ink-2"
           >
-            <X className="size-3" />
+            +{remaining}
           </button>
-        </div>
-      ))}
+        )}
+        {images.length === 0 && (
+          <div className="flex h-[57px] w-full items-center justify-center border border-dashed border-border text-[12px] text-je-ink-3">
+            No images
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ─── Moderation Notes Panel ──────────────────────────────────── */
-function ModerationNotes({ listingId }: { listingId: string }) {
-  const { data: notes } = useApiQuery(apiClient.notes.listByListing, {
-    listingId,
-  });
-  const [addNote] = useApiMutation(apiClient.notes.add);
-  const [removeNote] = useApiMutation(apiClient.notes.remove);
-  const [newNote, setNewNote] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!newNote.trim()) return;
-    setIsSubmitting(true);
-    try {
-      // The author is the session user on the Rails side.
-      await addNote({
-        listingId,
-        content: newNote.trim(),
-      });
-      setNewNote("");
-      toast.success("Note added");
-    } catch {
-      toast.error("Failed to add note");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (noteId: string) => {
-    try {
-      await removeNote({ id: noteId });
-      toast.success("Note deleted");
-    } catch {
-      toast.error("Failed to delete note");
-    }
-  };
-
+/* ─── Decision bar ──────────────────────────────────────────────── */
+function DecisionBar({
+  templates,
+  templateId,
+  onTemplate,
+  reasonType,
+  onReason,
+  onDecide,
+  onSkip,
+  busy,
+  compact,
+}: {
+  templates: any[];
+  templateId: string;
+  onTemplate: (v: string) => void;
+  reasonType: string;
+  onReason: (v: string) => void;
+  onDecide: (o: "approved" | "rejected" | "notice") => void;
+  onSkip: () => void;
+  busy: boolean;
+  compact?: boolean;
+}) {
+  const templateOptions = [
+    { value: "none", label: "No template" },
+    ...templates.map((t) => ({ value: t._id, label: t.displayName || t.name })),
+  ];
   return (
-    <div className="mt-3 border rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
-        <StickyNote className="size-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium">Moderation Notes</span>
-        {notes && notes.length > 0 && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-            {notes.length}
-          </Badge>
-        )}
+    <div
+      className={`flex flex-wrap items-center gap-2.5 border-t-2 border-t-je-ink bg-background ${compact ? "px-5 py-2.5" : "px-6 py-3"}`}
+    >
+      <Button
+        className="h-[38px] gap-2 rounded-none bg-je-success px-5 text-background hover:bg-je-success/90"
+        disabled={busy}
+        onClick={() => onDecide("approved")}
+      >
+        <Check className="size-4" /> Approve <Kbd className="border-white/40 bg-transparent text-white/90">A</Kbd>
+      </Button>
+      <Button
+        className="h-[38px] gap-2 rounded-none bg-je-error px-5 text-white hover:bg-je-error/90"
+        disabled={busy}
+        onClick={() => onDecide("rejected")}
+      >
+        <Ban className="size-4" /> Reject <Kbd className="border-white/40 bg-transparent text-white/90">R</Kbd>
+      </Button>
+      <Button
+        variant="outline"
+        className="h-[38px] gap-2 rounded-none border-je-warning-raw px-5 text-je-warning hover:bg-je-warning-bg"
+        disabled={busy}
+        onClick={() => onDecide("notice")}
+      >
+        <MessageSquare className="size-4" /> Notice <Kbd>N</Kbd>
+      </Button>
+      <Button
+        variant="ghost"
+        className="h-[38px] gap-2 rounded-none px-4 text-je-ink-2"
+        disabled={busy}
+        onClick={onSkip}
+      >
+        <SkipForward className="size-4" /> Skip <Kbd>S</Kbd>
+      </Button>
+
+      <div className="flex items-center gap-2">
+        <Select value={templateId} onValueChange={onTemplate}>
+          <SelectTrigger size="sm" className="h-[30px]! w-auto gap-1.5 rounded-none border-border px-2.5 text-[12px]">
+            <span className="text-je-ink-2">Template</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-none">
+            {templateOptions.map((o) => (
+              <SelectItem key={o.value} value={o.value} className="rounded-none text-[12px]">
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={reasonType} onValueChange={onReason}>
+          <SelectTrigger size="sm" className="h-[30px]! w-auto gap-1.5 rounded-none border-border px-2.5 text-[12px]">
+            <span className="text-je-ink-2">Reason</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-none">
+            {OVERRIDE_REASONS.map((o) => (
+              <SelectItem key={o.value} value={o.value} className="rounded-none text-[12px]">
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="p-3 space-y-2">
-        {/* Existing notes */}
-        {notes && notes.length > 0 && (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {notes.map((note: any) => (
-              <div
-                key={note._id}
-                className="flex items-start gap-2 p-2 bg-muted/30 rounded text-xs group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-medium">{note.authorName}</span>
-                    <span className="text-muted-foreground">
-                      {new Date(note.createdAt).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{note.content}</p>
-                </div>
-                <button
-                  type="button"
-                  className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-950 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                  onClick={() => handleDelete(note._id)}
-                  title="Delete note"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+      {busy && <Loader2 className="size-4 animate-spin text-je-ink-2" />}
+    </div>
+  );
+}
 
-        {notes && notes.length === 0 && (
-          <p className="text-xs text-muted-foreground italic py-1">No notes yet</p>
-        )}
+/* ─── Focus mode overlay ────────────────────────────────────────── */
+function FocusMode({
+  listing,
+  result,
+  scan,
+  index,
+  total,
+  imgIdx,
+  setImgIdx,
+  zoom,
+  setZoom,
+  onExit,
+  decisionBar,
+}: {
+  listing: Listing;
+  result?: Result;
+  scan?: any;
+  index: number;
+  total: number;
+  imgIdx: number;
+  setImgIdx: (n: number) => void;
+  zoom: boolean;
+  setZoom: (b: boolean) => void;
+  onExit: () => void;
+  decisionBar: React.ReactNode;
+}) {
+  const images: string[] = listing.imageUrls || [];
+  const hero = images[imgIdx];
+  const progress = total > 0 ? ((index + 1) / total) * 100 : 0;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* top strip */}
+      <div className="flex items-center gap-3.5 border-b border-border px-5 py-2.5">
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 rounded-none" onClick={onExit}>
+          ‹ Exit focus <Kbd>Esc</Kbd>
+        </Button>
+        <span className="text-[13px] font-semibold">{listing.title}</span>
+        <span className="num text-[13px] font-medium">{formatPrice(listing)}</span>
+        <span className="text-[12px] text-je-ink-2">
+          {formatLocation(listing)} · JE <span className="font-mono">{listing.jeId}</span>
+        </span>
+        <AgeChip sinceMs={listing.importedAt} />
+        <span className="num ml-auto text-[12px] text-je-ink-2">
+          {index + 1} of {total}
+        </span>
+        <span className="inline-block h-[3px] w-[120px] bg-je-surface">
+          <span className="block h-full bg-je-teal" style={{ width: `${progress}%` }} />
+        </span>
+        <span className="text-[12px] text-je-ink-2">
+          <Kbd>J</Kbd> next · <Kbd>K</Kbd> prev
+        </span>
+      </div>
 
-        {/* Add new note */}
-        <div className="flex gap-2">
-          <Textarea
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Add internal note..."
-            rows={2}
-            className="text-xs resize-none flex-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                handleSubmit();
-              }
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-end h-8 px-2"
-            onClick={handleSubmit}
-            disabled={!newNote.trim() || isSubmitting}
+      <div className="grid min-h-0 flex-1 grid-cols-[1fr_380px]">
+        {/* gallery */}
+        <div className="flex min-w-0 flex-col gap-2 p-4">
+          <div
+            className="relative min-h-0 flex-1 cursor-zoom-in overflow-hidden border border-border bg-je-surface-warm"
+            onClick={() => setZoom(!zoom)}
           >
-            <Send className="size-3.5" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Image Gallery with thumbnails ───────────────────────────── */
-function ImageGallery({ images, title }: { images: string[]; title: string }) {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [lightbox, setLightbox] = useState(false);
-  const maxThumbs = 5;
-  const remaining = images.length - maxThumbs;
-
-  if (images.length === 0) {
-    return (
-      <div className="w-full aspect-[4/3] bg-muted rounded-lg flex items-center justify-center">
-        <div className="text-center text-muted-foreground/50">
-          <Image className="size-10 mx-auto mb-1" />
-          <span className="text-xs">No images</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="space-y-2">
-        {/* Main image */}
-        <div
-          className="w-full aspect-[4/3] bg-muted rounded-lg overflow-hidden relative group cursor-pointer"
-          onClick={() => setLightbox(true)}
-        >
-          <img
-            src={jeImageUrl(images[activeIdx])}
-            alt={title}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = "";
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-            <Maximize2 className="size-5 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow" />
-          </div>
-          {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => { e.stopPropagation(); setActiveIdx((activeIdx - 1 + images.length) % images.length); }}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => { e.stopPropagation(); setActiveIdx((activeIdx + 1) % images.length); }}
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </>
-          )}
-          <span className="absolute bottom-1.5 right-1.5 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded-full">
-            {activeIdx + 1}/{images.length}
-          </span>
-        </div>
-        {images.length > 1 && (
-          <div className="flex gap-1">
-            {images.slice(0, maxThumbs).map((url, i) => (
-              <button
-                type="button"
-                key={i}
-                className={`w-12 h-9 rounded overflow-hidden border-2 transition-colors ${
-                  i === activeIdx ? "border-primary" : "border-transparent hover:border-muted-foreground/30"
-                }`}
-                onClick={() => setActiveIdx(i)}
-              >
-                <img src={jeImageUrl(url)} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-            {remaining > 0 && (
-              <div className="w-12 h-9 rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground font-medium">
-                +{remaining}
-              </div>
+            {hero ? (
+              <img src={jeImageUrl(hero)} alt={listing.title} className="size-full object-contain" />
+            ) : (
+              <div className="flex size-full items-center justify-center text-je-ink-3">No images</div>
             )}
-          </div>
-        )}
-      </div>
-
-      <Dialog open={lightbox} onOpenChange={setLightbox}>
-        <DialogContent className="max-w-4xl p-2">
-          <div className="relative">
-            <img
-              src={jeImageUrl(images[activeIdx])}
-              alt={title}
-              className="w-full max-h-[80vh] object-contain rounded"
-            />
             {images.length > 1 && (
               <>
                 <button
                   type="button"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
-                  onClick={() => setActiveIdx((activeIdx - 1 + images.length) % images.length)}
+                  aria-label="Previous image"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 p-1.5 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIdx((imgIdx - 1 + images.length) % images.length);
+                  }}
                 >
                   <ChevronLeft className="size-5" />
                 </button>
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
-                  onClick={() => setActiveIdx((activeIdx + 1) % images.length)}
+                  aria-label="Next image"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 p-1.5 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgIdx((imgIdx + 1) % images.length);
+                  }}
                 >
                   <ChevronRight className="size-5" />
                 </button>
+                <span className="num absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 text-[11px] text-white">
+                  {imgIdx + 1} / {images.length}
+                </span>
               </>
             )}
-            <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm bg-black/60 text-white px-3 py-1 rounded-full">
-              {activeIdx + 1} / {images.length}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {images.slice(0, 12).map((url, i) => (
+              <button
+                type="button"
+                key={i}
+                onClick={() => setImgIdx(i)}
+                className={`shrink-0 border-2 ${i === imgIdx ? "border-je-teal" : "border-transparent"}`}
+              >
+                <OpsThumb src={jeImageUrl(url)} width={72} height={54} />
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-4 text-[11.5px] text-je-ink-3">
+            <span>
+              <Kbd>←</Kbd> <Kbd>→</Kbd> browse images
             </span>
+            <span>
+              <Kbd>Z</Kbd> zoom
+            </span>
+            {listing.imageCount != null && <span>{listing.imageCount} images</span>}
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
+        </div>
 
-/* ─── Key/value parameter pill ────────────────────────────────── */
-function Param({ icon: Icon, label, value, warn, isNull }: { icon?: any; label: string; value: string | number | null | undefined; warn?: boolean; isNull?: boolean }) {
-  const showNull = isNull || value === null || value === undefined || value === "";
-  return (
-    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md ${
-      showNull
-        ? "bg-gray-50 dark:bg-gray-900/40 border border-dashed border-gray-200 dark:border-gray-700"
-        : warn
-          ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-          : "bg-muted"
-    }`}>
-      {Icon && <Icon className={`size-3 shrink-0 ${showNull ? "text-gray-300 dark:text-gray-600" : ""}`} />}
-      <span className="text-muted-foreground">{label}</span>
-      {showNull ? (
-        <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500 italic">null</span>
-      ) : (
-        <span className="font-medium">{value}</span>
-      )}
-    </div>
-  );
-}
-
-/* ─── Listing Card ────────────────────────────────────────────── */
-function ListingCard({ listing }: { listing: QueueListing }) {
-  const [expanded, setExpanded] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const [actionDialog, setActionDialog] = useState<"approve" | "reject" | "notice" | null>(null);
-  const [message, setMessage] = useState("");
-  const [reason, setReason] = useState("");
-  const [refuseReasonType, setRefuseReasonType] = useState("other");
-  const [permanent, setPermanent] = useState(false);
-  const [dismissedRules, setDismissedRules] = useState<Set<string>>(new Set());
-  const { data: results } = useApiQuery(apiClient.moderation.forListing, {
-    listingId: listing._id,
-  });
-  const { data: templates } = useApiQuery(apiClient.messages.list);
-  const [overrideDecision] = useApiMutation(apiClient.moderation.override);
-
-  const result = results?.[0];
-  const ruleMatches = result?.ruleMatches || [];
-
-  const handleDismissRule = (ruleName: string) => {
-    setDismissedRules((prev) => new Set([...prev, ruleName]));
-  };
-
-  const [actionLoading, setActionLoading] = useState(false);
-
-  // Reset dialog inputs on close — otherwise a canceled Reject leaves the
-  // refusal text in `message`, and a subsequent Approve would send it to the
-  // seller as sellerMessage.
-  const closeActionDialog = () => {
-    setActionDialog(null);
-    setMessage("");
-    setReason("");
-    setRefuseReasonType("other");
-    setPermanent(false);
-  };
-
-  const handleAction = async (
-    action: "approved" | "rejected" | "notice",
-    opts?: { permanent?: boolean },
-  ) => {
-    if (!result) {
-      toast.error("No moderation result found for this listing");
-      return;
-    }
-    const lockForever = opts?.permanent ?? permanent;
-    setActionLoading(true);
-    try {
-      // The override is attributed to the session moderator on the Rails side.
-      await overrideDecision({
-        resultId: result._id,
-        newOutcome: action,
-        reason: reason || undefined,
-        sellerMessage: action === "approved" ? undefined : message || undefined,
-        refuseReasonType: action === "rejected" ? refuseReasonType : undefined,
-        permanent: lockForever || undefined,
-      });
-      toast.success(
-        `Listing ${action === "approved" ? "approved" : action === "rejected" ? "rejected" : "noticed"}${lockForever ? " permanently (locked)" : ""}`,
-      );
-      closeActionDialog();
-    } catch (err) {
-      console.error("Override failed:", err);
-      toast.error("Failed to update listing: " + (err instanceof Error ? err.message : "Unknown error"));
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const priceDisplay = listing.priceOnRequest
-    ? "Price on Request"
-    : listing.priceUsd
-      ? `$${listing.priceUsd.toLocaleString()}`
-      : listing.price
-        ? `${listing.price.toLocaleString()} ${listing.currency || ""}`
-        : "N/A";
-
-  const location = [listing.city, listing.state, listing.country].filter(Boolean).join(", ");
-  const categoryLabel = listing.category?.replace("RealEstate", "Real Estate") || "—";
-  const typeLabel = listing.realEstateType
-    ? listing.realEstateType.charAt(0).toUpperCase() + listing.realEstateType.slice(1)
-    : null;
-
-  return (
-    <>
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          {/* Status banner with time waiting (Implio-style) */}
-          <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-2">
-              <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                Awaiting review in Manual Queue
-              </span>
-            </div>
-            <TimeWaiting since={listing.importedAt} />
+        {/* evidence rail */}
+        <div className="flex min-h-0 flex-col gap-3.5 overflow-y-auto border-l border-border p-4">
+          <div>
+            <SectionLabel className="mb-1.5">Why flagged</SectionLabel>
+            <WhyFlagged {...evidenceFromResult(result)} scan={scan} dense />
           </div>
-
-          {/* Dismissable rule pills */}
-          {ruleMatches.length > 0 && (
-            <div className="px-4 py-2 bg-muted/30 border-b">
-              <DismissableRulePills
-                ruleMatches={ruleMatches}
-                dismissedRules={dismissedRules}
-                onDismiss={handleDismissRule}
-              />
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row">
-            {/* Left: Image gallery */}
-            <div className="w-full sm:w-72 shrink-0 p-3">
-              <ImageGallery
-                images={listing.imageUrls || []}
-                title={listing.title}
-              />
-            </div>
-
-            {/* Right: Info panel */}
-            <div className="flex-1 min-w-0 p-4 sm:pl-0">
-              {/* Header row */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-sm leading-snug line-clamp-2">{listing.title}</h3>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    {location && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="size-3" />
-                        {location}
-                      </span>
-                    )}
-                    <span>•</span>
-                    <span className="font-medium text-foreground">{priceDisplay}</span>
-                    {listing.rental && <Badge variant="outline" className="text-[10px] py-0 px-1">Rental</Badge>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground" asChild>
-                    <a href={`https://www.jamesedition.com/admin/listings/${listing.jeId}/edit`} target="_blank" rel="noopener noreferrer" title="Open in JE Admin">
-                      Admin
-                    </a>
-                  </Button>
-                  {listing.listingUrl && (
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground" asChild>
-                      <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer" title="View on JamesEdition.com">
-                        <ExternalLink className="size-3" /> Live
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Parameter grid — categorized for easy navigation */}
-              <div className="mt-3 space-y-2.5">
-                {/* Basic Info */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Basic Info</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Tag} label="Category" value={categoryLabel !== "—" ? categoryLabel : null} />
-                    <Param icon={Tag} label="Type" value={typeLabel} />
-                    <Param icon={DollarSign} label="Price" value={listing.priceUsd != null ? `$${listing.priceUsd.toLocaleString()}` : listing.price != null ? `${listing.price.toLocaleString()} ${listing.currency || ""}` : null} />
-                    <Param label="POR" value={listing.priceOnRequest != null ? (listing.priceOnRequest ? "Yes" : "No") : null} />
-                    <Param label="Rental" value={listing.rental != null ? (listing.rental ? "Yes" : "No") : null} />
-                    <Param label="Pre-owned" value={listing.preOwned != null ? (listing.preOwned ? "Yes" : "No") : null} />
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Location</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={MapPin} label="Country" value={listing.country} />
-                    <Param label="City" value={listing.city} />
-                    <Param label="State" value={listing.state} />
-                  </div>
-                </div>
-
-                {/* Seller */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Seller</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Building} label="Office" value={listing.officeGroupName || listing.office || null} />
-                    <Param label="Plan" value={listing.officeSubscription} />
-                    <Param label="Feed" value={listing.feedSource} />
-                  </div>
-                </div>
-
-                {/* Property Details */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Property</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Bed} label="Beds" value={listing.bedrooms} warn={listing.bedrooms != null && listing.bedrooms > 20} />
-                    <Param icon={Bath} label="Baths" value={listing.bathrooms} warn={listing.bathrooms != null && listing.bathrooms > 20} />
-                    <Param icon={Ruler} label="Living" value={listing.livingArea != null ? `${listing.livingArea.toLocaleString()} m²` : null} />
-                    <Param icon={LandPlot} label="Land" value={listing.landArea != null ? `${listing.landArea.toLocaleString()} m²` : null} />
-                    <Param icon={DollarSign} label="Price/sqm" value={listing.pricePerSqm != null ? `$${listing.pricePerSqm.toLocaleString()}` : (listing.price && listing.livingArea ? `~$${Math.round(listing.price / listing.livingArea).toLocaleString()}` : null)} warn={listing.pricePerSqm != null && listing.pricePerSqm <= 1000} />
-                  </div>
-                </div>
-
-                {/* Content Quality */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Content Quality</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Image} label="Images" value={listing.imageCount ?? null} warn={listing.imageCount != null && listing.imageCount < 3} />
-                    <Param label="Avg Img" value={listing.avgImageWidth != null && listing.avgImageHeight != null ? `${Math.round(listing.avgImageWidth)}×${Math.round(listing.avgImageHeight)}px` : null} />
-                    <Param label="LQI" value={listing.lqi != null ? `${listing.lqi}%` : null} warn={listing.lqi != null && listing.lqi < 40} />
-                    <Param icon={FileText} label="Desc" value={listing.descriptionLength != null ? `${listing.descriptionLength} chars` : null} />
-                  </div>
-                </div>
-
-                {/* AI Analysis */}
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">AI Analysis</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Bot} label="AI Condition" value={listing.chatGptPropertyCondition != null ? `${listing.chatGptPropertyCondition}/6` : null} warn={listing.chatGptPropertyCondition != null && listing.chatGptPropertyCondition < 3} />
-                    <Param icon={Bot} label="AI Watermark" value={listing.chatGptWatermarkShare != null ? `${listing.chatGptWatermarkShare}/10` : null} warn={listing.chatGptWatermarkShare != null && listing.chatGptWatermarkShare > 2} />
-                    <Param icon={Bot} label="AI Img Quality" value={listing.chatGptImageQuality ?? null} warn={listing.chatGptImageQuality === "poor" || listing.chatGptImageQuality === "low"} />
-                  </div>
-                </div>
-              </div>
-
-              {/* HIDDEN: LAS Accuracy Data — hidden per Timur (2026-03-17), data still stored in DB */}
-
-              {/* LLM assessment */}
-              {result?.llmTriggered && result?.llmResponse && (
-                <div className="mt-2 p-2 bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 rounded text-xs">
-                  <div className="flex items-center gap-1 font-medium mb-1 text-violet-700 dark:text-violet-300">
-                    <Bot className="size-3" />
-                    LLM: {result.llmResponse.recommendation}
-                    {result.llmResponse.confidence && (
-                      <span className="opacity-70 ml-1">
-                        ({Math.round(result.llmResponse.confidence * 100)}%)
-                      </span>
-                    )}
-                  </div>
-                  {result.llmResponse.assessment && (
-                    <p className="text-violet-600/80 dark:text-violet-400/80">{result.llmResponse.assessment}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Expandable details */}
-              {expanded && (
-                <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs space-y-2 border">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    <div><span className="text-muted-foreground">JE ID:</span> <a href={`https://www.jamesedition.com/admin/listings/${listing.jeId}/edit`} target="_blank" rel="noopener noreferrer" className="font-mono text-primary hover:underline">{listing.jeId}</a></div>
-                    <div><span className="text-muted-foreground">Office ID:</span> {listing.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${encodeURIComponent(listing.office)}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                    <div><span className="text-muted-foreground">Avg img:</span> {listing.avgImageWidth != null && listing.avgImageHeight != null ? `${Math.round(listing.avgImageWidth)}×${Math.round(listing.avgImageHeight)}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                    <div><span className="text-muted-foreground">Pre-owned:</span> {listing.preOwned != null ? (listing.preOwned ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                    <div><span className="text-muted-foreground">Outdated:</span> {listing.outdated != null ? (listing.outdated ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                    <div><span className="text-muted-foreground">Year:</span> {listing.year != null ? listing.year : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                  </div>
-                  {listing.description && (
-                    <div className="pt-2 border-t">
-                      <span className="font-medium">Description:</span>
-                      <p className="text-muted-foreground mt-1 whitespace-pre-line line-clamp-6">{listing.description}</p>
-                    </div>
-                  )}
-                  {ruleMatches.length > 0 && (
-                    <div className="pt-2 border-t">
-                      <span className="font-medium">Rule details:</span>
-                      {ruleMatches.map((m: any, i: number) => (
-                        <div key={i} className="text-muted-foreground mt-1">
-                          • <span className="font-medium">{m.ruleName}</span>
-                          <span className="opacity-70"> ({m.tier}/{m.action})</span>: {m.details}
-                          {m.message && <div className="ml-3 mt-0.5 italic text-amber-600">→ "{m.message}"</div>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Moderation Notes (toggle) */}
-              {showNotes && (
-                <ModerationNotes listingId={listing._id} />
-              )}
-
-              {/* Action buttons */}
-              <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpanded(!expanded)}
-                    className="text-xs"
-                  >
-                    {expanded ? <ChevronUp className="size-3 mr-1" /> : <ChevronDown className="size-3 mr-1" />}
-                    {expanded ? "Less" : "Details"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowNotes(!showNotes)}
-                    className={`text-xs gap-1 ${showNotes ? "bg-muted" : ""}`}
-                  >
-                    <StickyNote className="size-3" />
-                    Notes
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-sky-600 border-sky-200 hover:bg-sky-50"
-                    onClick={() => {
-                      setMessage("");
-                      setActionDialog("notice");
-                    }}
-                  >
-                    <MessageSquare className="size-3.5 mr-1" />
-                    Notice
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={actionLoading}
-                    onClick={() => {
-                      // Auto-detect refuse reason from rules
-                      const hasImageRule = ruleMatches.some((m: any) =>
-                        /image|watermark|photo|picture|resolution/i.test(m.ruleName)
-                      );
-                      const hasDuplicateRule = ruleMatches.some((m: any) =>
-                        /duplicate/i.test(m.ruleName)
-                      );
-                      const hasIllegalRule = ruleMatches.some((m: any) =>
-                        /illegal|prohibited|weapon|drug/i.test(m.ruleName)
-                      );
-                      const detectedReason =
-                        hasImageRule ? "images" :
-                        hasDuplicateRule ? "duplicate" :
-                        hasIllegalRule ? "illegal" : "other";
-                      setRefuseReasonType(detectedReason);
-                      // Use default generic seller message for the detected reason
-                      const reasonType = REFUSE_REASON_TYPES.find((t) => t.value === detectedReason);
-                      setMessage(reasonType?.defaultMessage || "");
-                      setActionDialog("reject");
-                    }}
-                  >
-                    <XCircle className="size-3.5 mr-1" />
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={actionLoading}
-                    onClick={() => handleAction("approved")}
-                  >
-                    {actionLoading ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="size-3.5 mr-1" />}
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
-                    disabled={actionLoading}
-                    title="Approve and lock — automated re-moderation will never change this decision"
-                    onClick={() => handleAction("approved", { permanent: true })}
-                  >
-                    <Lock className="size-3.5 mr-1" />
-                    Approve forever
-                  </Button>
-                </div>
-              </div>
-            </div>
+          <div>
+            <SectionLabel className="mb-1.5">Facts</SectionLabel>
+            <ListingFacts listing={listing} />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Action Dialog with Refuse Reason Types */}
-      <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) closeActionDialog(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {actionDialog === "reject" ? "Reject Listing" : "Send Notice"}
-            </DialogTitle>
-            <DialogDescription>
-              {actionDialog === "reject"
-                ? "This listing will be refused. The seller will receive a message explaining why."
-                : "The listing stays live, but the seller gets a message about the issue."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Refuse Reason Type (only for reject) */}
-            {actionDialog === "reject" && (
-              <div>
-                <label className="text-sm font-medium">Refuse Reason</label>
-                <Select value={refuseReasonType} onValueChange={(val) => {
-                  setRefuseReasonType(val);
-                  // Update seller message to match the new reason's default
-                  const reasonType = REFUSE_REASON_TYPES.find((t) => t.value === val);
-                  if (reasonType?.defaultMessage) setMessage(reasonType.defaultMessage);
-                }}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REFUSE_REASON_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        <div className="flex items-center gap-2">
-                          <div className={`size-2 rounded-full ${type.color}`} />
-                          <span>{type.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {REFUSE_REASON_TYPES.find((t) => t.value === refuseReasonType)?.description}
-                </p>
-              </div>
-            )}
-
-            {templates && templates.length > 0 && (
-              <div>
-                <label className="text-sm font-medium">Template</label>
-                <Select
-                  onValueChange={(val) => {
-                    const t = templates.find((t: any) => t._id === val);
-                    if (t) setMessage(t.body);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose template..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates
-                      .filter((t: any) => t.category === (actionDialog === "reject" ? "reject" : "notice"))
-                      .map((t: any) => (
-                        <SelectItem key={t._id} value={t._id}>{t.displayName}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div>
-              <label className="text-sm font-medium">Seller Message</label>
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message to seller..."
-                rows={4}
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Internal Note (optional)</label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Why this decision..."
-                rows={2}
-                className="mt-1"
-              />
-            </div>
-
-            <label className="flex items-start gap-2 rounded-md border p-3 cursor-pointer">
-              <Checkbox
-                checked={permanent}
-                onCheckedChange={(v) => setPermanent(v === true)}
-                className="mt-0.5"
-              />
-              <span className="text-sm">
-                <span className="font-medium flex items-center gap-1">
-                  <Lock className="size-3.5" /> Final decision
-                </span>
-                <span className="text-muted-foreground">
-                  Lock this listing — feed re-imports and automated re-moderation
-                  will never change it until a moderator unlocks it.
-                </span>
-              </span>
-            </label>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={closeActionDialog}>
-              Cancel
-            </Button>
-            <Button
-              variant={actionDialog === "reject" ? "destructive" : "default"}
-              onClick={() => handleAction(actionDialog === "reject" ? "rejected" : "notice")}
-              disabled={(actionDialog === "reject" && !message) || actionLoading}
-            >
-              {actionLoading ? <Loader2 className="size-4 mr-2 animate-spin" /> : null}
-              {actionDialog === "reject"
-                ? `Reject — ${REFUSE_REASON_TYPES.find((t) => t.value === refuseReasonType)?.label || "Other"}`
-                : "Send Notice"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-export default function QueuePage() {
-  const { data: listings, error, refetch } = useApiQuery(apiClient.listings.pending, undefined, {
-    pollMs: 10000,
-  });
-
-  return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Manual Queue</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Listings that need human review — low-confidence or flagged rules
-        </p>
+        </div>
       </div>
 
-      {error && !listings ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
-            <p className="text-sm text-muted-foreground">Failed to load the queue: {error.message}</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-          </CardContent>
-        </Card>
-      ) : !listings ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="size-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : listings.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Inbox className="size-12 text-muted-foreground/30 mb-3" />
-            <p className="text-lg font-medium">Queue is empty</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              All listings have been reviewed. Nice work!
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {listings.length} listing{listings.length !== 1 ? "s" : ""} awaiting review
-          </p>
-          {listings.map((listing: any) => (
-            <ListingCard key={listing._id} listing={listing} />
+      {decisionBar}
+    </div>
+  );
+}
+
+/* ─── Shortcuts dialog ──────────────────────────────────────────── */
+function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boolean) => void }) {
+  const rows: [string, string][] = [
+    ["J / ↓", "Next listing"],
+    ["K / ↑", "Previous listing"],
+    ["A", "Approve"],
+    ["R", "Reject"],
+    ["N", "Notice"],
+    ["S", "Skip"],
+    ["F", "Open focus mode"],
+    ["← / →", "Browse images (focus mode)"],
+    ["Z", "Zoom image (focus mode)"],
+    ["Esc", "Exit focus mode"],
+    ["⌘K", "Inspect / jump"],
+    ["?", "This sheet"],
+  ];
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-none sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-y-1.5">
+          {rows.map(([k, label]) => (
+            <div key={k} className="flex items-center justify-between border-b border-border py-1 text-[13px]">
+              <span className="text-je-ink-2">{label}</span>
+              <Kbd>{k}</Kbd>
+            </div>
           ))}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────────────────── */
+export default function QueuePage() {
+  const { data: pendingData, error, refetch } = useApiQuery(apiClient.listings.pending, undefined, {
+    pollMs: 10000,
+  });
+  const { data: recentResults } = useApiQuery(apiClient.moderation.recent, { limit: 300 });
+  const { data: templates } = useApiQuery(apiClient.messages.list);
+  const { data: scans } = useApiQuery(apiClient.paramScans.recent, { limit: 300 });
+  const [override] = useApiMutation(apiClient.moderation.override);
+
+  const resultByListing = useMemo(() => {
+    const m = new Map<string, Result>();
+    for (const r of recentResults || []) {
+      // recent is processedAt desc → first seen per listing is the latest
+      if (!m.has(r.listingId)) m.set(r.listingId, r);
+    }
+    return m;
+  }, [recentResults]);
+  const scanMap = useMemo(
+    () => new Map((scans || []).map((s: any) => [s.listingId, s])),
+    [scans],
+  );
+
+  // Working queue (polling guard — never reflow on a background refetch).
+  const [queue, setQueue] = useState<Listing[] | null>(null);
+  const [decided, setDecided] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const [grouping, setGrouping] = useState<"list" | "byRule">("list");
+  const [density, setDensity] = useState<"comfortable" | "compact">(
+    () => (localStorage.getItem(DENSITY_KEY) as "comfortable" | "compact") || "comfortable",
+  );
+  const [sort, setSort] = useState("oldest");
+  const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState("any");
+  const [ruleFilter, setRuleFilter] = useState("any");
+
+  const [focusMode, setFocusMode] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
+  const [zoom, setZoom] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+
+  const [templateId, setTemplateId] = useState("none");
+  const [reasonType, setReasonType] = useState("other");
+  const [busy, setBusy] = useState(false);
+  const [bulk, setBulk] = useState<Set<string>>(new Set());
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(DENSITY_KEY, density);
+  }, [density]);
+
+  // Seed the working queue from the first successful load.
+  useEffect(() => {
+    if (pendingData && queue === null) {
+      setQueue(pendingData);
+      setSelectedId((prev) => prev ?? pendingData[0]?._id ?? null);
+    }
+  }, [pendingData, queue]);
+
+  const resultFor = useCallback((l: Listing | undefined) => (l ? resultByListing.get(l._id) : undefined), [resultByListing]);
+  const topRule = useCallback(
+    (l: Listing) => resultFor(l)?.ruleMatches?.[0]?.ruleName ?? null,
+    [resultFor],
+  );
+
+  const live = useMemo(() => (queue || []).filter((l) => !decided.has(l._id)), [queue, decided]);
+
+  const countryOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of live) if (l.country) set.add(l.country);
+    return [{ value: "any", label: "Any country" }, ...[...set].sort().map((c) => ({ value: c, label: c }))];
+  }, [live]);
+  const ruleOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of live) {
+      const r = topRule(l);
+      if (r) set.add(r);
+    }
+    return [{ value: "any", label: "Any rule" }, ...[...set].sort().map((r) => ({ value: r, label: r }))];
+  }, [live, topRule]);
+
+  const display = useMemo(() => {
+    let arr = live.slice();
+    const q = search.trim().toLowerCase();
+    if (q) {
+      arr = arr.filter(
+        (l) =>
+          l.title?.toLowerCase().includes(q) ||
+          l.jeId?.toLowerCase().includes(q) ||
+          l.office?.toLowerCase().includes(q) ||
+          l.officeGroupName?.toLowerCase().includes(q) ||
+          l.city?.toLowerCase().includes(q) ||
+          (topRule(l) || "").toLowerCase().includes(q),
+      );
+    }
+    if (countryFilter !== "any") arr = arr.filter((l) => l.country === countryFilter);
+    if (ruleFilter !== "any") arr = arr.filter((l) => topRule(l) === ruleFilter);
+    arr.sort((a, b) => {
+      if (sort === "newest") return (b.importedAt || 0) - (a.importedAt || 0);
+      if (sort === "price") return (b.priceUsd || b.price || 0) - (a.priceUsd || a.price || 0);
+      return (a.importedAt || 0) - (b.importedAt || 0); // oldest first (default)
+    });
+    return arr;
+  }, [live, search, countryFilter, ruleFilter, sort, topRule]);
+
+  // Keep selection valid.
+  useEffect(() => {
+    if (display.length === 0) return;
+    if (!selectedId || !display.some((l) => l._id === selectedId)) {
+      setSelectedId(display[0]._id);
+    }
+  }, [display, selectedId]);
+
+  const selectedIndex = display.findIndex((l) => l._id === selectedId);
+  const selected = selectedIndex >= 0 ? display[selectedIndex] : undefined;
+  const selectedResult = resultFor(selected);
+
+  useEffect(() => {
+    setImgIdx(0);
+    setZoom(false);
+    setShowNotes(false);
+  }, [selectedId]);
+
+  // Buffered new arrivals (surface, don't reflow).
+  const queueIds = useMemo(() => new Set((queue || []).map((l) => l._id)), [queue]);
+  const buffered = useMemo(
+    () => (pendingData || []).filter((l: Listing) => !queueIds.has(l._id) && !decided.has(l._id)),
+    [pendingData, queueIds, decided],
+  );
+
+  const applyRefresh = useCallback(() => {
+    if (!pendingData) return;
+    setQueue(pendingData.filter((l: Listing) => !decided.has(l._id)));
+    void refetch();
+  }, [pendingData, decided, refetch]);
+
+  const selectByOffset = useCallback(
+    (delta: number) => {
+      if (display.length === 0) return;
+      const i = display.findIndex((l) => l._id === selectedId);
+      const next = Math.max(0, Math.min(display.length - 1, (i < 0 ? 0 : i) + delta));
+      setSelectedId(display[next]._id);
+    },
+    [display, selectedId],
+  );
+
+  const undoDecision = useCallback(
+    async (listing: Listing, result: Result) => {
+      try {
+        await override({ resultId: result._id, newOutcome: "manual" });
+        setDecided((prev) => {
+          const n = new Set(prev);
+          n.delete(listing._id);
+          return n;
+        });
+        setSelectedId(listing._id);
+        toast.success("Reverted to queue");
+      } catch {
+        toast.error("Undo failed");
+      }
+    },
+    [override],
+  );
+
+  const decide = useCallback(
+    async (outcome: "approved" | "rejected" | "notice", listingArg?: Listing) => {
+      const listing = listingArg || selected;
+      if (!listing) return;
+      const result = resultFor(listing);
+      if (!result?._id) {
+        toast.error("No moderation result for this listing yet");
+        return;
+      }
+
+      // Advance selection *before* the optimistic removal so place is kept.
+      const idx = display.findIndex((l) => l._id === listing._id);
+      const nextListing = display[idx + 1] || display[idx - 1] || null;
+
+      // Build seller message for reject / notice.
+      let sellerMessage: string | undefined;
+      let refuse: string | undefined;
+      if (outcome === "rejected" || outcome === "notice") {
+        const tpl = (templates || []).find((t: any) => t._id === templateId);
+        const matchMsg = result.ruleMatches?.find((m: any) => m.message)?.message;
+        sellerMessage =
+          tpl?.body ||
+          matchMsg ||
+          REFUSE_REASON_TYPES.find((r) => r.value === (outcome === "rejected" ? "other" : "other"))?.defaultMessage;
+        if (outcome === "rejected") refuse = "other";
+      }
+
+      setBusy(true);
+      setDecided((prev) => new Set(prev).add(listing._id));
+      setSelectedId(nextListing?._id ?? null);
+      try {
+        await override({
+          resultId: result._id,
+          newOutcome: outcome,
+          reason: reasonType !== "other" ? reasonType : undefined,
+          sellerMessage,
+          refuseReasonType: refuse,
+        });
+        const verb = outcome === "approved" ? "approved" : outcome === "rejected" ? "rejected" : "noticed";
+        toast(`${listing.title} — ${verb}`, {
+          duration: 8000,
+          action: { label: "Undo", onClick: () => undoDecision(listing, result) },
+        });
+      } catch (e) {
+        setDecided((prev) => {
+          const n = new Set(prev);
+          n.delete(listing._id);
+          return n;
+        });
+        setSelectedId(listing._id);
+        toast.error("Decision failed: " + (e instanceof Error ? e.message : "unknown"));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selected, resultFor, display, templates, templateId, reasonType, override, undoDecision],
+  );
+
+  const skip = useCallback(() => selectByOffset(1), [selectByOffset]);
+
+  // Bulk decide (By rule grouping).
+  const bulkDecide = useCallback(
+    async (outcome: "approved" | "rejected" | "notice") => {
+      const ids = [...bulk];
+      if (ids.length === 0) return;
+      setBusy(true);
+      let ok = 0;
+      for (const id of ids) {
+        const listing = live.find((l) => l._id === id);
+        const result = resultFor(listing);
+        if (!result?._id) continue;
+        try {
+          const tpl = (templates || []).find((t: any) => t._id === templateId);
+          await override({
+            resultId: result._id,
+            newOutcome: outcome,
+            reason: reasonType !== "other" ? reasonType : undefined,
+            sellerMessage: outcome !== "approved" ? tpl?.body : undefined,
+            refuseReasonType: outcome === "rejected" ? "other" : undefined,
+          });
+          setDecided((prev) => new Set(prev).add(id));
+          ok += 1;
+        } catch {
+          /* keep going */
+        }
+      }
+      setBulk(new Set());
+      setBusy(false);
+      toast.success(`${ok} listing${ok === 1 ? "" : "s"} ${outcome}`);
+    },
+    [bulk, live, resultFor, templates, templateId, reasonType, override],
+  );
+
+  // Keyboard map.
+  useQueueKeyboard(
+    {
+      next: () => selectByOffset(1),
+      prev: () => selectByOffset(-1),
+      approve: () => decide("approved"),
+      reject: () => decide("rejected"),
+      notice: () => decide("notice"),
+      skip,
+      focus: () => selected && setFocusMode(true),
+      escape: () => setFocusMode(false),
+      help: () => setShortcutsOpen(true),
+      prevImage: () => {
+        if (focusMode && selected?.imageUrls?.length) {
+          setImgIdx((i) => (i - 1 + selected.imageUrls.length) % selected.imageUrls.length);
+        }
+      },
+      nextImage: () => {
+        if (focusMode && selected?.imageUrls?.length) {
+          setImgIdx((i) => (i + 1) % selected.imageUrls.length);
+        }
+      },
+      zoom: () => focusMode && setZoom((z) => !z),
+    },
+    !shortcutsOpen,
+  );
+
+  const decisionBar = (
+    <DecisionBar
+      templates={templates || []}
+      templateId={templateId}
+      onTemplate={setTemplateId}
+      reasonType={reasonType}
+      onReason={setReasonType}
+      onDecide={(o) => decide(o)}
+      onSkip={skip}
+      busy={busy}
+      compact={focusMode}
+    />
+  );
+
+  // ── Render states ──
+  if (error && !queue) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+        <p className="text-sm text-je-ink-2">Failed to load the queue: {error.message}</p>
+        <Button variant="outline" size="sm" className="rounded-none" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  if (queue === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-12">
+        <Loader2 className="size-7 animate-spin text-je-ink-3" />
+      </div>
+    );
+  }
+
+  const rowPadY = density === "compact" ? "py-[7px]" : "py-2.5";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Topbar */}
+      <div className="flex items-center gap-3.5 border-b border-border px-6 py-3.5">
+        <h1 className="text-[18px] font-semibold tracking-tight">Queue</h1>
+        <span className="text-[12px] text-je-ink-2">
+          {live.length} awaiting{display.length !== live.length ? ` · ${display.length} shown` : ""}
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex h-[30px] items-center border border-border text-[12px]">
+            <button
+              type="button"
+              className={`flex h-full items-center px-3 ${grouping === "list" ? "bg-je-ink font-medium text-background" : "text-je-ink-2"}`}
+              onClick={() => setGrouping("list")}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={`flex h-full items-center border-l border-border px-3 ${grouping === "byRule" ? "bg-je-ink font-medium text-background" : "text-je-ink-2"}`}
+              onClick={() => setGrouping("byRule")}
+            >
+              By rule
+            </button>
+          </div>
+          <Select value={density} onValueChange={(v) => setDensity(v as any)}>
+            <SelectTrigger size="sm" className="h-[30px]! w-auto gap-1.5 rounded-none border-border px-2.5 text-[12px]">
+              <span className="text-je-ink-2">Density</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-none">
+              <SelectItem value="comfortable" className="rounded-none text-[12px]">
+                Comfortable
+              </SelectItem>
+              <SelectItem value="compact" className="rounded-none text-[12px]">
+                Compact
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-[30px] gap-1.5 rounded-none"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <Keyboard className="size-3.5" /> Shortcuts <Kbd>?</Kbd>
+          </Button>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-2.5">
+        <div className="flex h-[30px] min-w-[220px] flex-1 items-center gap-2 border border-border px-2.5 sm:flex-none">
+          <Search className="size-3.5 text-je-ink-3" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search title, JE ID, office…"
+            className="h-full w-full bg-transparent text-[12.5px] outline-none placeholder:text-je-ink-3"
+          />
+          {search && (
+            <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="text-je-ink-3">
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+        <Facet
+          label="Rule"
+          value={ruleFilter}
+          active={ruleFilter !== "any"}
+          options={ruleOptions}
+          onChange={setRuleFilter}
+        />
+        <Facet
+          label="Country"
+          value={countryFilter}
+          active={countryFilter !== "any"}
+          options={countryOptions}
+          onChange={setCountryFilter}
+        />
+        <Facet
+          label="Sort"
+          value={sort}
+          options={[
+            { value: "oldest", label: "Oldest first" },
+            { value: "newest", label: "Newest first" },
+            { value: "price", label: "Highest price" },
+          ]}
+          onChange={setSort}
+        />
+        <div className="ml-auto text-[12px] text-je-ink-2">
+          {buffered.length > 0 ? (
+            <button type="button" className="inline-flex items-center gap-1.5" onClick={applyRefresh}>
+              {buffered.length} new since you opened ·{" "}
+              <span className="inline-flex items-center gap-1 font-medium text-je-teal">
+                <RefreshCw className="size-3" /> refresh
+              </span>
+            </button>
+          ) : (
+            <button type="button" className="inline-flex items-center gap-1 text-je-ink-3" onClick={applyRefresh}>
+              <RefreshCw className="size-3" /> up to date
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Split */}
+      {display.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-16 text-center">
+          <Inbox className="size-10 text-je-ink-3" />
+          <p className="text-[15px] font-medium">{live.length === 0 ? "Queue is empty" : "No matches"}</p>
+          <p className="text-[13px] text-je-ink-2">
+            {live.length === 0 ? "All listings have been reviewed. Nice work." : "Adjust the filters above."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[400px_1fr]">
+          {/* List pane */}
+          <div className="hidden min-h-0 overflow-y-auto border-r border-border lg:block">
+            {grouping === "byRule" && bulk.size > 0 && (
+              <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-je-ink bg-je-teal-bg px-3 py-2 text-[12px]">
+                <span className="font-medium">{bulk.size} selected</span>
+                <Button size="sm" className="ml-auto h-7 rounded-none bg-je-success px-2.5 text-background" disabled={busy} onClick={() => bulkDecide("approved")}>
+                  Approve all
+                </Button>
+                <Button size="sm" className="h-7 rounded-none bg-je-error px-2.5 text-white" disabled={busy} onClick={() => bulkDecide("rejected")}>
+                  Reject all
+                </Button>
+                <button type="button" aria-label="Clear selection" className="text-je-ink-3" onClick={() => setBulk(new Set())}>
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+            <QueueList
+              display={display}
+              grouping={grouping}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onOpenFocus={() => setFocusMode(true)}
+              topRule={topRule}
+              now={now}
+              rowPadY={rowPadY}
+              bulk={bulk}
+              setBulk={setBulk}
+            />
+          </div>
+
+          {/* Detail pane */}
+          <div className="flex min-h-0 flex-col">
+            {selected ? (
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5">
+                  {/* header */}
+                  <div className="flex items-start gap-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-[17px] font-semibold">{selected.title}</span>
+                        <span className="num text-[15px] font-medium">{formatPrice(selected)}</span>
+                        <AgeChip sinceMs={selected.importedAt} prefix="in queue" now={now} />
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[12.5px] text-je-ink-2">
+                        <span>{formatLocation(selected) || "—"}</span>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1">
+                          JE <span className="font-mono">{selected.jeId}</span>
+                          <button
+                            type="button"
+                            title="Copy JE ID"
+                            aria-label="Copy JE ID"
+                            className="text-je-ink-3 hover:text-je-ink"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(selected.jeId);
+                              toast.success("JE ID copied");
+                            }}
+                          >
+                            <Copy className="size-3" />
+                          </button>
+                        </span>
+                        <span>·</span>
+                        <a
+                          href={`https://www.jamesedition.com/admin/listings/${selected.jeId}/edit`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-je-teal hover:underline"
+                        >
+                          Admin ↗
+                        </a>
+                        {selected.listingUrl && (
+                          <a
+                            href={selected.listingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-je-teal hover:underline"
+                          >
+                            <ExternalLink className="size-3" /> Live ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`h-7 gap-1.5 rounded-none ${showNotes ? "border-je-teal text-je-teal" : ""}`}
+                      onClick={() => setShowNotes((v) => !v)}
+                    >
+                      <StickyNote className="size-3.5" /> Notes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 rounded-none"
+                      onClick={() => setFocusMode(true)}
+                    >
+                      <Maximize2 className="size-3.5" /> Focus <Kbd>F</Kbd>
+                    </Button>
+                  </div>
+
+                  {/* why flagged */}
+                  <SectionLabel className="mb-1.5 mt-4">Why flagged</SectionLabel>
+                  <WhyFlagged {...evidenceFromResult(selectedResult)} scan={scanMap.get(selected._id)} />
+
+                  {/* notes */}
+                  {showNotes && (
+                    <div className="mt-3">
+                      <ModerationNotes listingId={selected._id} />
+                    </div>
+                  )}
+
+                  {/* facts */}
+                  <SectionLabel className="mb-1.5 mt-4">Listing facts</SectionLabel>
+                  <ListingFacts listing={selected} />
+
+                  {/* media */}
+                  <div className="mb-5 mt-4">
+                    <MediaStrip images={selected.imageUrls || []} onFocus={() => setFocusMode(true)} />
+                  </div>
+                </div>
+
+                {decisionBar}
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-je-ink-3">Select a listing</div>
+            )}
+          </div>
+        </div>
       )}
+
+      {focusMode && selected && (
+        <FocusMode
+          listing={selected}
+          result={selectedResult}
+          scan={scanMap.get(selected._id)}
+          index={selectedIndex}
+          total={display.length}
+          imgIdx={imgIdx}
+          setImgIdx={setImgIdx}
+          zoom={zoom}
+          setZoom={setZoom}
+          onExit={() => setFocusMode(false)}
+          decisionBar={decisionBar}
+        />
+      )}
+
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
+  );
+}
+
+/* ─── List pane rows (incl. By-rule grouping) ───────────────────── */
+function QueueList({
+  display,
+  grouping,
+  selectedId,
+  onSelect,
+  onOpenFocus,
+  topRule,
+  now,
+  rowPadY,
+  bulk,
+  setBulk,
+}: {
+  display: Listing[];
+  grouping: "list" | "byRule";
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onOpenFocus: () => void;
+  topRule: (l: Listing) => string | null;
+  now: number;
+  rowPadY: string;
+  bulk: Set<string>;
+  setBulk: (s: Set<string>) => void;
+}) {
+  const Row = ({ l }: { l: Listing }) => {
+    const sel = l._id === selectedId;
+    const rule = topRule(l);
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect(l._id)}
+        onDoubleClick={onOpenFocus}
+        className={`flex items-center gap-2.5 border-b border-border px-3.5 pl-4 ${rowPadY} ${
+          sel ? "bg-je-teal-bg shadow-[inset_2px_0_0_var(--je-teal)]" : "hover:bg-je-surface"
+        }`}
+      >
+        {grouping === "byRule" && (
+          <Checkbox
+            checked={bulk.has(l._id)}
+            onCheckedChange={(c) => {
+              const n = new Set(bulk);
+              if (c) n.add(l._id);
+              else n.delete(l._id);
+              setBulk(n);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-none"
+          />
+        )}
+        <OpsThumb src={jeImageUrl((l.imageUrls || [])[0])} size={44} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-[13px] font-medium">{l.title}</span>
+            <span className="num shrink-0 text-[12.5px] font-medium">{formatPrice(l)}</span>
+          </div>
+          <div className="mb-1 mt-0.5 truncate text-[11.5px] text-je-ink-2">{formatLocationOffice(l)}</div>
+          <div className="flex items-center gap-1.5">
+            {rule && <RuleChip name={rule} />}
+            <AgeChip sinceMs={l.importedAt} now={now} />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (grouping === "list") {
+    return (
+      <>
+        {display.map((l) => (
+          <Row key={l._id} l={l} />
+        ))}
+      </>
+    );
+  }
+
+  // By rule — group rows under the fired rule.
+  const groups = new Map<string, Listing[]>();
+  for (const l of display) {
+    const r = topRule(l) || "no rule fired";
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r)!.push(l);
+  }
+  return (
+    <>
+      {[...groups.entries()]
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([rule, items]) => (
+          <div key={rule}>
+            <div className="flex items-center justify-between bg-je-surface px-4 py-1.5">
+              <span className="font-mono text-[11px] text-je-ink-2">{rule}</span>
+              <span className="num text-[11px] text-je-ink-3">{items.length}</span>
+            </div>
+            {items.map((l) => (
+              <Row key={l._id} l={l} />
+            ))}
+          </div>
+        ))}
+    </>
   );
 }

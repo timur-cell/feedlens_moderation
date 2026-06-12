@@ -6,9 +6,6 @@ import {
   Bot,
   Building,
   Loader2,
-  Pencil,
-  TrendingUp,
-  AlertTriangle,
   Image,
   CheckCircle2,
   XCircle,
@@ -18,9 +15,7 @@ import {
   Plus,
   Sparkles,
   Wrench,
-  Trash2,
   Search,
-  Eye,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -48,20 +43,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -71,7 +52,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { StatusChip, PrecisionBar, SectionLabel } from "@/components/ops";
+import { rulePrecision, formatAge } from "@/lib/queueFormat";
 import { toast } from "sonner";
 
 // ─── Config maps ─────────────────────────────────────────────────
@@ -82,12 +71,6 @@ const categoryConfig: Record<string, { label: string; icon: any; color: string }
   auto_ai: { label: "Auto AI", icon: Regex, color: "text-blue-600" },
   former_manual: { label: "Former Manual", icon: ShieldAlert, color: "text-orange-600" },
   internal: { label: "Internal", icon: Building, color: "text-zinc-500" },
-};
-
-const tierConfig: Record<string, { label: string; color: string }> = {
-  auto: { label: "Auto", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
-  verify: { label: "Verify", color: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300" },
-  manual: { label: "Manual", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
 };
 
 const actionConfig: Record<string, { label: string; color: string }> = {
@@ -103,21 +86,7 @@ const outcomeIcons: Record<string, { icon: any; color: string; label: string }> 
   manual: { icon: Clock, color: "text-amber-600", label: "Manual" },
 };
 
-const listingCategoryConfig: Record<string, { label: string; color: string }> = {
-  real_estate: { label: "Real Estate", color: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800" },
-  cars: { label: "Cars", color: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800" },
-};
-
-// ─── Date formatters ─────────────────────────────────────────────
-
-function formatDate(ts?: number): string {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+// ─── Date formatter ──────────────────────────────────────────────
 
 function formatDateTime(ts?: number): string {
   if (!ts) return "—";
@@ -245,108 +214,169 @@ function ItemsMatchedByRule({ ruleName }: { ruleName: string }) {
   );
 }
 
-// ─── Rule Preview Dialog ────────────────────────────────────────
+// ─── Rule detail drawer ─────────────────────────────────────────
 
-function RulePreviewDialog({ rule, open, onClose }: { rule: any; open: boolean; onClose: () => void }) {
+function actionKind(action: string): "rejected" | "notice" | "manual" {
+  return action === "reject" ? "rejected" : action === "notice" ? "notice" : "manual";
+}
+
+function RuleDrawer({
+  rule,
+  open,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  rule: any;
+  open: boolean;
+  onClose: () => void;
+  onEdit: (r: any) => void;
+  onDelete: (r: any) => void;
+}) {
   const [showMatched, setShowMatched] = useState(false);
+  // Reset the matched-items panel whenever a different rule opens.
+  useMemo(() => setShowMatched(false), [rule?._id]);
 
   if (!rule) return null;
 
-  const catConfig = categoryConfig[rule.category] || categoryConfig.simple_code;
-  const CatIcon = catConfig.icon;
-  const tConfig = tierConfig[rule.tier] || tierConfig.manual;
-  const aConfig = actionConfig[rule.action] || actionConfig.flag;
-  const fpRate = rule.falsePositiveCount && rule.matchCount
-    ? Math.round((rule.falsePositiveCount / rule.matchCount) * 100) : 0;
+  const precision = rulePrecision(rule);
+  const listRefs = [
+    ["match", rule.config?.listRef],
+    ["+match", rule.config?.additionalListRef],
+    ["exclude", rule.config?.excludeListRef],
+    ["exclude title", rule.config?.excludeTitleListRef],
+    ["watermark", rule.config?.watermarkListRef],
+  ].filter(([, v]) => v) as [string, string][];
+  const lowPrecision = precision != null && precision < 60 && rule.enabled;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CatIcon className={`size-5 ${catConfig.color}`} />
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 rounded-none p-0 sm:max-w-[480px]">
+        <SheetHeader className="gap-1 border-b border-border p-5">
+          <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold">
             {rule.displayName}
-          </DialogTitle>
-          <DialogDescription>
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{rule.name}</code>
-          </DialogDescription>
-        </DialogHeader>
+            {lowPrecision && <StatusChip kind="shadow" label="Shadow candidate" />}
+            {!rule.enabled && <StatusChip kind="off" label="Disabled" />}
+          </SheetTitle>
+          <div className="text-[12px] text-je-ink-2">
+            {(categoryConfig[rule.category]?.label || rule.category)} ·{" "}
+            {rule.listingCategory === "cars" ? "cars" : "real estate"} ·{" "}
+            {actionConfig[rule.action]?.label?.toLowerCase() || rule.action}s to {rule.tier} tier
+          </div>
+        </SheetHeader>
 
-        <div className="space-y-4">
-          {rule.description && (
-            <p className="text-sm text-muted-foreground">{rule.description}</p>
-          )}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+          {rule.description && <p className="text-[13px] text-je-ink-2">{rule.description}</p>}
 
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip kind={actionKind(rule.action)} label={actionConfig[rule.action]?.label || rule.action} />
             {rule.listingCategory && (
-              <Badge variant="outline" className={listingCategoryConfig[rule.listingCategory]?.color || ""}>
-                {listingCategoryConfig[rule.listingCategory]?.label || rule.listingCategory}
-              </Badge>
+              <span className="inline-flex h-5 items-center rounded-[4px] border border-border bg-je-surface px-1.5 text-[10px] text-je-ink-2">
+                {rule.listingCategory === "cars" ? "Cars" : "Real estate"}
+              </span>
             )}
-            <Badge className={`${tConfig.color} border-0`}>{tConfig.label}</Badge>
-            <Badge className={`${aConfig.color} border-0`}>{aConfig.label}</Badge>
-            <Badge variant="outline">{catConfig.label}</Badge>
+            <span className="inline-flex h-5 items-center rounded-[4px] border border-border bg-je-surface px-1.5 text-[10px] text-je-ink-2">
+              priority {rule.priority}
+            </span>
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><TrendingUp className="size-3" /> {rule.matchCount || 0} matches</span>
-            {fpRate > 0 && <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="size-3" /> {fpRate}% FP</span>}
-            {rule.lastMatchedAt && <span>Last: {formatDate(rule.lastMatchedAt)}</span>}
-            <span>Priority: {rule.priority}</span>
-          </div>
-
-          {/* List references */}
-          {(rule.config?.listRef || rule.config?.excludeListRef || rule.config?.additionalListRef || rule.config?.watermarkListRef || rule.config?.excludeTitleListRef) && (
-            <div>
-              <span className="text-xs font-medium">📋 Referenced Lists:</span>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {rule.config?.listRef && <span className="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-[11px]">match: <code>{rule.config.listRef}</code></span>}
-                {rule.config?.additionalListRef && <span className="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-[11px]">+match: <code>{rule.config.additionalListRef}</code></span>}
-                {rule.config?.excludeListRef && <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-[11px]">exclude: <code>{rule.config.excludeListRef}</code></span>}
-                {rule.config?.excludeTitleListRef && <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-[11px]">exclude title: <code>{rule.config.excludeTitleListRef}</code></span>}
-                {rule.config?.watermarkListRef && <span className="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded text-[11px]">watermark: <code>{rule.config.watermarkListRef}</code></span>}
-              </div>
-            </div>
-          )}
-
-          {/* Config */}
+          {/* Condition */}
           <div>
-            <span className="text-xs font-medium">Config:</span>
-            <pre className="mt-1 p-3 bg-muted rounded-lg text-xs overflow-x-auto max-h-60">
+            <SectionLabel className="mb-1.5">Condition</SectionLabel>
+            <pre className="max-h-48 overflow-auto bg-je-surface px-2.5 py-2 font-mono text-[11.5px]">
               {JSON.stringify(rule.config, null, 2)}
             </pre>
           </div>
 
-          {rule.sellerMessage && (
+          {/* Performance / precision */}
+          <div>
+            <SectionLabel className="mb-1.5">Performance</SectionLabel>
+            <div className="border border-je-teal-border bg-je-teal-bg px-3 py-2.5 text-[12.5px]">
+              <div className="flex items-center justify-between">
+                <span className="num font-medium">{(rule.matchCount || 0).toLocaleString()} matches</span>
+                <PrecisionBar pct={precision} width={64} />
+              </div>
+              <div className="mt-1.5 text-je-ink-2">
+                {precision == null
+                  ? "Never matched — nothing to judge yet."
+                  : `${rule.falsePositiveCount || 0} overridden by moderators · last match ${rule.lastMatchedAt ? formatAge(rule.lastMatchedAt) + " ago" : "—"}.`}
+                {lowPrecision && " Precision below 60% — consider shadow review."}
+              </div>
+            </div>
+          </div>
+
+          {/* Linked */}
+          {(listRefs.length > 0 || rule.sellerMessage) && (
             <div>
-              <span className="text-xs font-medium">Seller message:</span>
-              <p className="text-sm text-muted-foreground mt-1 bg-muted/50 p-2 rounded">{rule.sellerMessage}</p>
+              <SectionLabel className="mb-1.5">Linked</SectionLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {listRefs.map(([kind, ref]) => (
+                  <span
+                    key={kind}
+                    className="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border bg-background px-1.5 text-[11px]"
+                  >
+                    <span className="text-je-ink-3">{kind}:</span>
+                    <span className="font-mono">{ref}</span>
+                  </span>
+                ))}
+                {rule.sellerMessage && (
+                  <span className="inline-flex h-5 items-center rounded-[4px] border border-border bg-background px-1.5 text-[11px]">
+                    template
+                  </span>
+                )}
+              </div>
+              {rule.sellerMessage && (
+                <p className="mt-2 bg-je-surface px-2.5 py-1.5 text-[12px] text-je-ink-2">{rule.sellerMessage}</p>
+              )}
             </div>
           )}
 
-          {/* Audit */}
-          <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground border-t pt-3">
-            <div><span className="font-medium text-foreground">Created:</span> {formatDateTime(rule.createdAt || rule._creationTime)}</div>
-            <div><span className="font-medium text-foreground">Last modified:</span> {formatDateTime(rule.lastModifiedAt)}</div>
-            <div><span className="font-medium text-foreground">Modified by:</span> {rule.lastModifiedBy || "—"}</div>
+          {/* History */}
+          <div>
+            <SectionLabel className="mb-1.5">History</SectionLabel>
+            <div className="border-b border-border py-1.5 text-[12px]">
+              <div className="text-je-ink-2">{formatDateTime(rule.lastModifiedAt)} · {rule.lastModifiedBy || "system"}</div>
+              <div>Last modified</div>
+            </div>
+            <div className="py-1.5 text-[12px]">
+              <div className="text-je-ink-2">{formatDateTime(rule.createdAt || rule._creationTime)}</div>
+              <div>Created</div>
+            </div>
           </div>
 
-          {/* Items matched */}
-          <div className="border-t pt-3">
-            <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowMatched(!showMatched)}>
-              <List className="size-3 mr-1" />
+          {/* Matched items */}
+          <div className="border-t border-border pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-none text-xs"
+              onClick={() => setShowMatched((v) => !v)}
+            >
+              <List className="mr-1 size-3" />
               {showMatched ? "Hide matched items" : "Show matched items"}
               {(rule.matchCount || 0) > 0 && (
-                <Badge variant="secondary" className="text-[9px] ml-1 h-4 px-1">{rule.matchCount}</Badge>
+                <span className="num ml-1 text-je-ink-3">· {rule.matchCount}</span>
               )}
             </Button>
             {showMatched && <ItemsMatchedByRule ruleName={rule.name} />}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <SheetFooter className="flex-row gap-2 border-t border-border p-4">
+          <Button size="sm" className="rounded-none" onClick={() => onEdit(rule)}>
+            Edit rule
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto rounded-none text-je-error hover:text-je-error"
+            onClick={() => onDelete(rule)}
+          >
+            Retire…
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -667,7 +697,44 @@ function CreateRuleDialog({ open, onClose, existingRuleNames }: { open: boolean;
   );
 }
 
-// ─── Main Page: Table Layout ────────────────────────────────────
+// ─── Toolbar facet ──────────────────────────────────────────────
+
+function Facet({
+  label,
+  value,
+  active,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  active?: boolean;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        size="sm"
+        className={`h-[30px]! w-auto gap-1.5 rounded-none border-border px-2.5 text-[12px] ${
+          active ? "border-je-teal bg-je-teal-bg text-je-teal" : ""
+        }`}
+      >
+        <span className="text-je-ink-2">{label}</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="rounded-none">
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} className="rounded-none text-[12px]">
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// ─── Main Page: analytics table + drawer ────────────────────────
 
 export default function RulesPage() {
   const { data: rules } = useApiQuery(apiClient.rules.list);
@@ -675,42 +742,56 @@ export default function RulesPage() {
   const [removeRule] = useApiMutation(apiClient.rules.remove);
 
   const [editingRule, setEditingRule] = useState<any>(null);
-  const [previewRule, setPreviewRule] = useState<any>(null);
+  const [drawerRule, setDrawerRule] = useState<any>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [listingCategoryFilter, setListingCategoryFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState("all");
+  const [actionFilter, setActionFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sort, setSort] = useState("matches");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchParams] = useSearchParams();
   const highlightedRule = searchParams.get("highlight");
 
   const filtered = useMemo(() => {
     if (!rules) return [];
-    return rules.filter((r: any) => {
+    let arr = rules.filter((r: any) => {
       const catMatch = categoryFilter === "all" || r.category === categoryFilter;
-      const lcMatch = listingCategoryFilter === "all" || r.listingCategory === listingCategoryFilter;
-      const searchMatch = !searchQuery || r.displayName.toLowerCase().includes(searchQuery.toLowerCase()) || r.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return catMatch && lcMatch && searchMatch;
+      const scopeMatch = scopeFilter === "all" || r.listingCategory === scopeFilter;
+      const actionMatch = actionFilter === "all" || r.action === actionFilter;
+      const statusMatch =
+        statusFilter === "all" || (statusFilter === "live" ? r.enabled : !r.enabled);
+      const q = searchQuery.toLowerCase();
+      const searchMatch =
+        !q ||
+        r.displayName.toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        (r.description || "").toLowerCase().includes(q);
+      return catMatch && scopeMatch && actionMatch && statusMatch && searchMatch;
     });
-  }, [rules, categoryFilter, listingCategoryFilter, searchQuery]);
-
-  const sorted = useMemo(() => [...filtered].sort((a: any, b: any) => a.priority - b.priority), [filtered]);
+    arr = arr.slice().sort((a: any, b: any) => {
+      if (sort === "matches") return (b.matchCount || 0) - (a.matchCount || 0);
+      if (sort === "precision") return (rulePrecision(a) ?? 101) - (rulePrecision(b) ?? 101);
+      if (sort === "name") return a.displayName.localeCompare(b.displayName);
+      return a.priority - b.priority;
+    });
+    return arr;
+  }, [rules, categoryFilter, scopeFilter, actionFilter, statusFilter, sort, searchQuery]);
 
   if (!rules) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-1 items-center justify-center p-12">
+        <Loader2 className="size-7 animate-spin text-je-ink-3" />
       </div>
     );
   }
 
   const enabledCount = rules.filter((r: any) => r.enabled).length;
+  const offCount = rules.length - enabledCount;
 
   const handleToggle = (rule: any) => {
-    // The Rails API attributes the change to the session user.
-    toggleEnabled({ id: rule._id }).catch(() =>
-      toast.error(`Failed to toggle rule "${rule.displayName}"`),
-    );
+    toggleEnabled({ id: rule._id }).catch(() => toast.error(`Failed to toggle "${rule.displayName}"`));
   };
 
   const handleDelete = async () => {
@@ -719,239 +800,206 @@ export default function RulesPage() {
       await removeRule({ id: deleteConfirm._id });
       toast.success(`Rule "${deleteConfirm.displayName}" deleted`);
       setDeleteConfirm(null);
+      setDrawerRule(null);
     } catch {
       toast.error("Failed to delete rule");
     }
   };
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Rules</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {enabledCount} of {rules.length} rules active
-          </p>
-        </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="size-4 mr-1.5" /> Create Rule
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Topbar */}
+      <div className="flex items-center gap-3.5 border-b border-border px-6 py-3.5">
+        <h1 className="text-[18px] font-semibold tracking-tight">Rules</h1>
+        <span className="text-[12px] text-je-ink-2">
+          {enabledCount} live · {offCount} off
+        </span>
+        <Button size="sm" className="ml-auto h-[30px] gap-1.5 rounded-none" onClick={() => setShowCreateDialog(true)}>
+          <Plus className="size-3.5" /> New rule
         </Button>
       </div>
 
-      {/* Filters & Search */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search rules..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-2.5">
+        <div className="flex h-[30px] min-w-[220px] items-center gap-2 border border-border px-2.5">
+          <Search className="size-3.5 text-je-ink-3" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search name, behavior, list…"
+            className="h-full w-full bg-transparent text-[12.5px] outline-none placeholder:text-je-ink-3"
+          />
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">Listing Type</span>
-          <div className="flex gap-1.5">
-            <Button variant={listingCategoryFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setListingCategoryFilter("all")}>All ({rules.length})</Button>
-            {(["real_estate", "cars"] as const).map((lc) => {
-              const count = rules.filter((r: any) => r.listingCategory === lc).length;
-              return (
-                <Button key={lc} variant={listingCategoryFilter === lc ? "default" : "outline"} size="sm" onClick={() => setListingCategoryFilter(lc)}>
-                  {lc === "real_estate" ? "Real Estate" : "Cars"} ({count})
-                </Button>
-              );
-            })}
-          </div>
-          <div className="w-px h-5 bg-border mx-1" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">Rule Type</span>
-          <div className="flex gap-1.5">
-            <Button variant={categoryFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter("all")}>All</Button>
-            {Object.entries(categoryConfig).map(([key, config]) => {
-              const count = rules.filter((r: any) => r.category === key).length;
-              if (count === 0) return null;
-              const Icon = config.icon;
-              return (
-                <Button key={key} variant={categoryFilter === key ? "default" : "outline"} size="sm" onClick={() => setCategoryFilter(key)}>
-                  <Icon className="size-3.5 mr-1" /> {config.label} ({count})
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Results count */}
-      <div className="text-xs text-muted-foreground">
-        {sorted.length === rules.length
-          ? `${rules.length} rules`
-          : `${sorted.length} of ${rules.length} rules`
-        }
+        <Facet
+          label="Scope"
+          value={scopeFilter}
+          active={scopeFilter !== "all"}
+          options={[
+            { value: "all", label: "All types" },
+            { value: "real_estate", label: "Real estate" },
+            { value: "cars", label: "Cars" },
+          ]}
+          onChange={setScopeFilter}
+        />
+        <Facet
+          label="Type"
+          value={categoryFilter}
+          active={categoryFilter !== "all"}
+          options={[
+            { value: "all", label: "Any" },
+            ...Object.entries(categoryConfig).map(([k, c]) => ({ value: k, label: c.label })),
+          ]}
+          onChange={setCategoryFilter}
+        />
+        <Facet
+          label="Action"
+          value={actionFilter}
+          active={actionFilter !== "all"}
+          options={[
+            { value: "all", label: "Any" },
+            { value: "reject", label: "Reject" },
+            { value: "notice", label: "Notice" },
+            { value: "flag", label: "Flag" },
+          ]}
+          onChange={setActionFilter}
+        />
+        <Facet
+          label="Status"
+          value={statusFilter}
+          active={statusFilter !== "all"}
+          options={[
+            { value: "all", label: "All" },
+            { value: "live", label: "Live" },
+            { value: "off", label: "Disabled" },
+          ]}
+          onChange={setStatusFilter}
+        />
+        <Facet
+          label="Sort"
+          value={sort}
+          options={[
+            { value: "matches", label: "Matches 7d" },
+            { value: "precision", label: "Precision" },
+            { value: "name", label: "Name" },
+            { value: "priority", label: "Priority" },
+          ]}
+          onChange={setSort}
+        />
+        <span className="ml-auto text-[12px] text-je-ink-3">{filtered.length} shown</span>
       </div>
 
       {/* Table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="w-[60px]">Status</TableHead>
-                <TableHead className="min-w-[250px]">Name</TableHead>
-                <TableHead className="w-[120px]">Created at</TableHead>
-                <TableHead className="w-[140px]">Last modified at</TableHead>
-                <TableHead className="w-[150px]">Last modified by</TableHead>
-                <TableHead className="w-[120px]">Rule action</TableHead>
-                <TableHead className="w-[100px] text-right"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                    No rules match your filters.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sorted.map((rule: any) => {
-                  const catConfig2 = categoryConfig[rule.category] || categoryConfig.simple_code;
-                  const CatIcon = catConfig2.icon;
-                  const aConfig2 = actionConfig[rule.action] || actionConfig.flag;
-                  const isHighlighted = highlightedRule === rule.name;
+      <div className="min-h-0 flex-1 overflow-auto px-6">
+        <table className="w-full border-collapse text-[12.5px]">
+          <thead className="sticky top-0 bg-background">
+            <tr className="border-b border-je-ink text-[10px] uppercase tracking-[0.09em] text-je-ink-2">
+              <th className="w-[44px] py-2 pr-3 text-left font-semibold" />
+              <th className="py-2 pr-3 text-left font-semibold">Rule</th>
+              <th className="w-[90px] py-2 pr-3 text-left font-semibold">Scope</th>
+              <th className="w-[90px] py-2 pr-3 text-left font-semibold">Action</th>
+              <th className="w-[80px] py-2 pr-3 text-right font-semibold">Matches</th>
+              <th className="w-[120px] py-2 pr-3 text-left font-semibold">Precision</th>
+              <th className="w-[100px] py-2 pr-3 text-left font-semibold">Last match</th>
+              <th className="w-[140px] py-2 text-left font-semibold">Modified by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-je-ink-2">
+                  No rules match your filters.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((rule: any) => {
+                const precision = rulePrecision(rule);
+                const lowPrecision = precision != null && precision < 60 && rule.enabled;
+                const isHighlighted = highlightedRule === rule.name;
+                return (
+                  <tr
+                    key={rule._id}
+                    onClick={() => setDrawerRule(rule)}
+                    className={`cursor-pointer border-b border-border align-middle hover:bg-je-surface ${
+                      isHighlighted ? "bg-je-teal-bg" : ""
+                    } ${!rule.enabled ? "opacity-60" : ""}`}
+                  >
+                    <td className="py-2.5 pr-3" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={rule.enabled}
+                        onCheckedChange={() => handleToggle(rule)}
+                        className="data-[state=checked]:bg-je-success"
+                      />
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{rule.displayName}</span>
+                        {lowPrecision && <StatusChip kind="shadow" label="Shadow?" />}
+                      </div>
+                      {rule.description && (
+                        <div className="max-w-[420px] truncate text-[11.5px] text-je-ink-2">{rule.description}</div>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      <span className="inline-flex h-5 items-center rounded-[4px] border border-border bg-je-surface px-1.5 text-[10px] text-je-ink-2">
+                        {rule.listingCategory === "cars" ? "Cars" : "RE"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      <StatusChip kind={actionKind(rule.action)} label={actionConfig[rule.action]?.label || rule.action} />
+                    </td>
+                    <td className="num py-2.5 pr-3 text-right font-semibold">{rule.matchCount || 0}</td>
+                    <td className="py-2.5 pr-3">
+                      <PrecisionBar pct={precision} width={48} />
+                    </td>
+                    <td className="py-2.5 pr-3 text-je-ink-2">
+                      {rule.lastMatchedAt ? `${formatAge(rule.lastMatchedAt)} ago` : "—"}
+                    </td>
+                    <td className="py-2.5 text-je-ink-2">{truncateEmail(rule.lastModifiedBy)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
-                  return (
-                    <TableRow
-                      key={rule._id}
-                      className={`group transition-colors ${!rule.enabled ? "opacity-50" : ""} ${isHighlighted ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
-                    >
-                      {/* Status toggle */}
-                      <TableCell>
-                        <Switch
-                          checked={rule.enabled}
-                          onCheckedChange={() => handleToggle(rule)}
-                          className="data-[state=checked]:bg-emerald-500"
-                        />
-                      </TableCell>
-
-                      {/* Name */}
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <CatIcon className={`size-4 ${catConfig2.color} shrink-0`} />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm truncate">{rule.displayName}</span>
-                              {rule.listingCategory && (
-                                <Badge variant="outline" className={`text-[10px] shrink-0 ${listingCategoryConfig[rule.listingCategory]?.color || ""}`}>
-                                  {rule.listingCategory === "real_estate" ? "RE" : "Cars"}
-                                </Badge>
-                              )}
-                            </div>
-                            {rule.description && (
-                              <p className="text-[11px] text-muted-foreground truncate max-w-[350px]">{rule.description}</p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Created at */}
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDate(rule.createdAt || rule._creationTime)}
-                      </TableCell>
-
-                      {/* Last modified at */}
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateTime(rule.lastModifiedAt)}
-                      </TableCell>
-
-                      {/* Last modified by */}
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-xs text-muted-foreground cursor-default">
-                                {truncateEmail(rule.lastModifiedBy)}
-                              </span>
-                            </TooltipTrigger>
-                            {rule.lastModifiedBy && rule.lastModifiedBy.length > 20 && (
-                              <TooltipContent><p>{rule.lastModifiedBy}</p></TooltipContent>
-                            )}
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-
-                      {/* Rule action */}
-                      <TableCell>
-                        <Badge className={`text-xs border-0 ${aConfig2.color}`}>
-                          {aConfig2.label}
-                        </Badge>
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-7" onClick={() => setPreviewRule(rule)}>
-                                  <Eye className="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Preview rule</p></TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-7" onClick={() => setEditingRule(rule)}>
-                                  <Pencil className="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Edit rule</p></TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => setDeleteConfirm(rule)}>
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Delete rule</p></TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      {/* Drawer */}
+      <RuleDrawer
+        rule={drawerRule}
+        open={!!drawerRule}
+        onClose={() => setDrawerRule(null)}
+        onEdit={(r) => {
+          setDrawerRule(null);
+          setEditingRule(r);
+        }}
+        onDelete={(r) => setDeleteConfirm(r)}
+      />
 
       {/* Edit dialog */}
       {editingRule && <RuleEditorDialog rule={editingRule} open={!!editingRule} onClose={() => setEditingRule(null)} />}
 
-      {/* Preview dialog */}
-      <RulePreviewDialog rule={previewRule} open={!!previewRule} onClose={() => setPreviewRule(null)} />
-
       {/* Create dialog */}
-      <CreateRuleDialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} existingRuleNames={rules.map((r: any) => r.name)} />
+      <CreateRuleDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        existingRuleNames={rules.map((r: any) => r.name)}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-none">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete rule?</AlertDialogTitle>
+            <AlertDialogTitle>Retire rule?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteConfirm?.displayName}</strong>? This action cannot be undone.
+              Delete <strong>{deleteConfirm?.displayName}</strong>? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -3,11 +3,53 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─── JamesEdition design-system fonts (bound _ds bundle) ───────────────── */
+@font-face {
+  font-family: "Heldane";
+  src: url("/fonts/HeldaneRegular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Heldane";
+  src: url("/fonts/HeldaneMedium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter400.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter500.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter600.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Heldane", "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -46,98 +88,156 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* JamesEdition ops palette — exposed as Tailwind color utilities (text-je-teal, bg-je-surface…) */
+  --color-je-ink: var(--je-ink);
+  --color-je-ink-2: var(--je-ink-2);
+  --color-je-ink-3: var(--je-ink-3);
+  --color-je-hairline: var(--je-hairline);
+  --color-je-surface: var(--je-surface);
+  --color-je-surface-warm: var(--je-surface-warm);
+  --color-je-teal: var(--je-teal);
+  --color-je-teal-bg: var(--je-teal-bg);
+  --color-je-teal-border: var(--je-teal-border);
+  --color-je-success: var(--je-success);
+  --color-je-success-bg: var(--je-success-bg);
+  --color-je-error: var(--je-error);
+  --color-je-error-bg: var(--je-error-bg);
+  --color-je-warning: var(--je-warning);
+  --color-je-warning-raw: var(--je-warning-raw);
+  --color-je-warning-bg: var(--je-warning-bg);
+  --color-je-gold: var(--je-gold);
 }
 
 :root {
-  --sidebar-width: 16rem;
+  --sidebar-width: 15rem;
   --sidebar-width-icon: 3rem;
 
-  --primary: var(--color-slate-900);
-  --primary-foreground: var(--color-white);
-  --sidebar-primary: var(--color-slate-900);
-  --sidebar-primary-foreground: var(--color-slate-50);
+  /* Square corners — borders over shadows (JE ops dialect). */
+  --radius: 0px;
 
-  --success: var(--color-emerald-600);
-  --success-foreground: var(--color-white);
-  --warning: var(--color-amber-500);
-  --warning-foreground: var(--color-amber-950);
-  --info: var(--color-cyan-500);
-  --info-foreground: var(--color-white);
+  /* ── JamesEdition ops tokens (mirror of _ds colors_and_type.css + feedlens-ops.css) ── */
+  --je-ink: #151515;
+  --je-ink-2: #595959; /* lifted from #717171 for 4.5:1 at ≤11px metadata */
+  --je-ink-3: #8a8a8a;
+  --je-hairline: #e0e0e0;
+  --je-surface: #f5f5f5;
+  --je-surface-warm: #eeedea;
+  --je-teal: #006c75;
+  --je-teal-active: #00565e;
+  --je-teal-bg: #eff4f5;
+  --je-teal-border: #99c4c8;
+  --je-success: #16907a;
+  --je-success-bg: #edf7f4;
+  --je-error: #e5362b;
+  --je-error-bg: #fdf0ef;
+  --je-warning: #b97718; /* darkened for text contrast */
+  --je-warning-raw: #e79e32;
+  --je-warning-bg: #fdf6ec;
+  --je-gold: #ceb687;
 
-  --chart-1: var(--color-teal-500);
-  --chart-2: var(--color-orange-500);
-  --chart-3: var(--color-cyan-500);
-  --chart-4: var(--color-rose-500);
-  --chart-5: var(--color-lime-500);
+  /* ── shadcn semantic tokens, repointed at JE palette ── */
+  --background: #ffffff;
+  --foreground: #151515;
+  --card: #ffffff;
+  --card-foreground: #151515;
+  --popover: #ffffff;
+  --popover-foreground: #151515;
 
-  --radius: 0.625rem;
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.15 0.01 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 260);
-  --secondary: oklch(0.96 0.005 260);
-  --secondary-foreground: oklch(0.3 0.01 260);
-  --muted: oklch(0.96 0.005 260);
-  --muted-foreground: oklch(0.45 0.015 260);
-  --accent: oklch(0.96 0.005 260);
-  --accent-foreground: oklch(0.15 0.01 260);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.005 260);
-  --input: oklch(0.92 0.005 260);
-  --ring: oklch(0.3 0.02 260);
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.15 0.01 260);
-  --sidebar-accent: oklch(0.96 0.005 260);
-  --sidebar-accent-foreground: oklch(0.15 0.01 260);
-  --sidebar-border: oklch(0.92 0.005 260);
-  --sidebar-ring: oklch(0.3 0.02 260);
+  --primary: #151515;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #151515;
+  --muted: #f5f5f5;
+  --muted-foreground: #595959;
+  --accent: #eff4f5;
+  --accent-foreground: #006c75;
+
+  --destructive: #e5362b;
+  --destructive-foreground: #ffffff;
+  --success: #16907a;
+  --success-foreground: #ffffff;
+  --warning: #e79e32;
+  --warning-foreground: #151515;
+  --info: #006c75;
+  --info-foreground: #ffffff;
+
+  --border: #e0e0e0;
+  --input: #e0e0e0;
+  --ring: #006c75;
+
+  --chart-1: #006c75;
+  --chart-2: #16907a;
+  --chart-3: #e79e32;
+  --chart-4: #e5362b;
+  --chart-5: #ceb687;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #151515;
+  --sidebar-primary: #151515;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eff4f5;
+  --sidebar-accent-foreground: #006c75;
+  --sidebar-border: #e0e0e0;
+  --sidebar-ring: #006c75;
 }
 
 .dark {
-  --primary: var(--color-white);
-  --primary-foreground: var(--color-slate-900);
-  --sidebar-primary: var(--color-white);
-  --sidebar-primary-foreground: var(--color-slate-900);
+  --je-ink: #f2f2f2;
+  --je-ink-2: #a5a5a5;
+  --je-ink-3: #7c7c7c;
+  --je-hairline: #2a2a2a;
+  --je-surface: #1c1c1c;
+  --je-surface-warm: #20201e;
+  --je-teal: #4bb3bd;
+  --je-teal-bg: #10302f;
+  --je-teal-border: #2d5a5c;
+  --je-success: #3fb89e;
+  --je-success-bg: #11302a;
+  --je-error: #ef6258;
+  --je-error-bg: #321918;
+  --je-warning: #e0a85a;
+  --je-warning-raw: #e79e32;
+  --je-warning-bg: #2a2113;
+  --je-gold: #ceb687;
 
-  --success: var(--color-emerald-400);
-  --success-foreground: var(--color-emerald-950);
-  --warning: var(--color-amber-400);
-  --warning-foreground: var(--color-amber-950);
-  --info: var(--color-cyan-400);
-  --info-foreground: var(--color-cyan-950);
+  --background: #131313;
+  --foreground: #f2f2f2;
+  --card: #181818;
+  --card-foreground: #f2f2f2;
+  --popover: #181818;
+  --popover-foreground: #f2f2f2;
 
-  --chart-1: var(--color-teal-400);
-  --chart-2: var(--color-orange-400);
-  --chart-3: var(--color-cyan-400);
-  --chart-4: var(--color-rose-400);
-  --chart-5: var(--color-lime-400);
+  --primary: #f2f2f2;
+  --primary-foreground: #151515;
+  --secondary: #1f1f1f;
+  --secondary-foreground: #ededed;
+  --muted: #1f1f1f;
+  --muted-foreground: #a5a5a5;
+  --accent: #10302f;
+  --accent-foreground: #4bb3bd;
 
-  --background: oklch(0.12 0.01 260);
-  --foreground: oklch(0.95 0.005 260);
-  --card: oklch(0.16 0.01 260);
-  --card-foreground: oklch(0.95 0.005 260);
-  --popover: oklch(0.16 0.01 260);
-  --popover-foreground: oklch(0.95 0.005 260);
-  --secondary: oklch(0.22 0.01 260);
-  --secondary-foreground: oklch(0.9 0.005 260);
-  --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.6 0.01 260);
-  --accent: oklch(0.22 0.01 260);
-  --accent-foreground: oklch(0.95 0.005 260);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.9 0.01 260);
-  --sidebar: oklch(0.14 0.01 260);
-  --sidebar-foreground: oklch(0.95 0.005 260);
-  --sidebar-accent: oklch(0.22 0.01 260);
-  --sidebar-accent-foreground: oklch(0.95 0.005 260);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.9 0.01 260);
+  --destructive: #ef6258;
+  --destructive-foreground: #ffffff;
+  --success: #3fb89e;
+  --success-foreground: #08130f;
+  --warning: #e0a85a;
+  --warning-foreground: #1a1408;
+  --info: #4bb3bd;
+  --info-foreground: #08130f;
+
+  --border: #2a2a2a;
+  --input: #2f2f2f;
+  --ring: #4bb3bd;
+
+  --sidebar: #161616;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #f2f2f2;
+  --sidebar-primary-foreground: #151515;
+  --sidebar-accent: #10302f;
+  --sidebar-accent-foreground: #4bb3bd;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #4bb3bd;
 }
 
 @layer base {
@@ -146,6 +246,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -157,6 +260,14 @@
   input[type="checkbox"]:not(:disabled),
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
+  }
+  /* Every metric / price reads with tabular numerals (JE ops requirement). */
+  .num,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  .font-serif {
+    font-family: var(--font-serif);
   }
 }
 

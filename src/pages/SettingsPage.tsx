@@ -1257,17 +1257,19 @@ function AppearanceSection() {
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaultTab = searchParams.get("tab") || "profile";
+  // Team moved out to its own /team page — fold any stale ?tab=team into Profile.
+  const requested = searchParams.get("tab") || "profile";
+  const defaultTab = requested === "team" ? "profile" : requested;
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value }, { replace: true });
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your account, team, alerts, and AI configuration</p>
+        <p className="text-muted-foreground mt-1">System configuration — alerts, AI, integrations, appearance. Manage people in <a href="/team" className="text-je-teal hover:underline">Team</a>.</p>
       </div>
 
       <Tabs value={defaultTab} onValueChange={handleTabChange}>
@@ -1275,10 +1277,6 @@ export function SettingsPage() {
           <TabsTrigger value="profile" className="gap-1.5">
             <User className="size-3.5" />
             <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="team" className="gap-1.5">
-            <Users className="size-3.5" />
-            <span className="hidden sm:inline">Team</span>
           </TabsTrigger>
           <TabsTrigger value="alerts" className="gap-1.5">
             <Bell className="size-3.5" />
@@ -1296,10 +1294,6 @@ export function SettingsPage() {
 
         <TabsContent value="profile">
           <ProfileSection />
-        </TabsContent>
-
-        <TabsContent value="team">
-          <TeamSection />
         </TabsContent>
 
         <TabsContent value="alerts">
