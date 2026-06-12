@@ -11,12 +11,16 @@ namespace :bq do
   # bq-test-<date> (view in the UI, then `rake bq:test_purge`). Moderation
   # runs the full engine incl. vision/LLM on triggered listings → real
   # Anthropic spend that scales with LIMIT.
-  desc "Test the BQ sync on arbitrary countries/volume (ENV: COUNTRIES, LIMIT, DAYS) without touching the cron watermark"
+  desc "Test the BQ sync on arbitrary countries/volume (ENV: COUNTRIES, LIMIT, DAYS, SETTLE) without touching the cron watermark"
   task test: :environment do
     countries = (ENV["COUNTRIES"].presence || "ES,PT").split(",")
     limit = (ENV["LIMIT"].presence || "100").to_i
     days = (ENV["DAYS"].presence || "7").to_i
-    result = Listings::BqSync.test_run(countries: countries, limit: limit, since: days.days.ago)
+    # SETTLE=0 to test fresh listings (and see the data_marts ETL lag); defaults
+    # to the cron's 48h settle window so a test mirrors production.
+    settle = (ENV["SETTLE"].presence || Listings::BqSync::SETTLE_HOURS.to_s).to_i
+    result = Listings::BqSync.test_run(countries: countries, limit: limit,
+                                       since: days.days.ago, settle_hours: settle)
     puts JSON.pretty_generate(result)
   end
 

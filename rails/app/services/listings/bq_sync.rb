@@ -23,6 +23,14 @@ module Listings
     # the scope are not backfilled when it widens (the watermark will already
     # have passed them). `test_run` can target any countries independently.
     COUNTRIES = %w[ES PT].freeze
+    # Settle window (Timur, 2026-06-12): only moderate listings created at
+    # least this long ago. data_marts child tables lag the parent: images in
+    # pg_listing_assets reach 100% coverage only ~24-48h after creation, and
+    # descriptions lag too. Moderating fresher listings runs the engine on
+    # incomplete data (false few_pictures / low_lqi / short_description, vision
+    # can't fetch images). 48h guarantees the child data has synced. Nothing is
+    # skipped — fresher listings are simply deferred until they settle.
+    SETTLE_HOURS = 48
 
     class << self
       # Daily cron entry point.
@@ -35,12 +43,13 @@ module Listings
         # First run bootstraps the watermark to NOW ("from now", no backfill).
         state = SyncState.find_or_create_by!(key: WATERMARK_KEY) { |s| s.watermark_at = Time.current }
 
-        rows = fetch_rows(since: state.watermark_at, countries: COUNTRIES, limit: MAX_LISTINGS_PER_RUN)
+        rows = fetch_rows(since: state.watermark_at, countries: COUNTRIES,
+                          limit: MAX_LISTINGS_PER_RUN, settle_hours: SETTLE_HOURS)
         return { error: true } if rows.nil?
 
         if rows.length >= MAX_LISTINGS_PER_RUN
           Rails.logger.warn("BQ sync: per-run cap #{MAX_LISTINGS_PER_RUN} reached — " \
-                            "older listings in the window are skipped (newest-first, no backfill)")
+                            "older settled listings in the window are skipped (newest-first, no backfill)")
         end
 
         batch_id = "bq-sync-#{Time.current.utc.to_date.iso8601}"
@@ -82,14 +91,14 @@ module Listings
       # Anthropic spend that scales with `limit`. Returns a verbose summary
       # (outcome distribution, fired rules, llm count). Never advances or reads
       # the cron's SyncState.
-      def test_run(countries: COUNTRIES, limit: 100, since: 7.days.ago)
+      def test_run(countries: COUNTRIES, limit: 100, since: 7.days.ago, settle_hours: SETTLE_HOURS)
         unless Integrations::BigqueryClient.configured?
           Rails.logger.info("BQ test_run skipped: GOOGLE_APPLICATION_CREDENTIALS not configured")
           return { skipped: true }
         end
 
         countries = normalize_countries(countries)
-        rows = fetch_rows(since: since, countries: countries, limit: limit)
+        rows = fetch_rows(since: since, countries: countries, limit: limit, settle_hours: settle_hours)
         return { error: true } if rows.nil?
 
         batch_id = "bq-test-#{Time.current.utc.to_date.iso8601}"
@@ -143,10 +152,10 @@ module Listings
         { created: created, skipped: skipped, errors: errors }
       end
 
-      def fetch_rows(since:, countries:, limit:)
+      def fetch_rows(since:, countries:, limit:, settle_hours:)
         Integrations::BigqueryClient.query(
           build_sql(countries: countries, limit: limit),
-          params: { since: since }
+          params: { since: since, ceiling: settle_hours.to_i.hours.ago }
         )
       rescue StandardError => e
         Rails.logger.error("BQ sync: query failed, watermark untouched: #{e.class}: #{e.message}")
@@ -179,6 +188,7 @@ module Listings
               AND l.type IN ('Listing::RealEstateListing', 'Listing::CarListing')
               AND l.country_code IN (#{country_list})
               AND l.listing_created_at > @since
+              AND l.listing_created_at <= @ceiling
             ORDER BY l.listing_created_at DESC
             LIMIT #{limit_n}
           ),

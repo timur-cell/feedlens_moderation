@@ -26,9 +26,14 @@ The Rails 8 app in `rails/` replaces the Convex backend (`convex/`, frozen on br
 
 ## BigQuery listing sync
 
-`BqListingSyncJob` (recurring.yml, daily 06:00 UTC) pulls newly created active
-RealEstate/Car listings (initial scope: ES/PT — `Listings::BqSync::COUNTRIES`)
-from `data_marts` in BigQuery via `Listings::BqSync`,
+`BqListingSyncJob` (recurring.yml, daily 06:00 UTC) pulls active RealEstate/Car
+listings (initial scope: ES/PT — `Listings::BqSync::COUNTRIES`) created at least
+`SETTLE_HOURS` (48h) ago — the data_marts child tables (images in
+`pg_listing_assets`, descriptions) lag the parent by ~24–48h, so moderating
+fresher listings would run the engine on incomplete data (false
+few_pictures/low_lqi/short_description, vision can't fetch images). Fresher
+listings are deferred, not skipped. Pulls the newest `MAX_LISTINGS_PER_RUN`
+(300) of the settled window from `data_marts` via `Listings::BqSync`,
 watermarked on `listing_created_at` (`sync_states` row `bq_listings`,
 bootstrapped to first-run time — no backfill). Each new listing runs through
 `Moderation::Runner` with `param_scan: false` (no per-listing Claude call;
@@ -46,6 +51,7 @@ widening the cron's `MAX_LISTINGS_PER_RUN` (300) or `COUNTRIES` (ES/PT).
 
 ```bash
 COUNTRIES=ES,PT,FR,IT LIMIT=1000 DAYS=14 bin/rails bq:test   # defaults: ES,PT / 100 / 7
+SETTLE=0 bin/rails bq:test                                    # test FRESH listings (exposes the ETL lag)
 bin/rails bq:test_purge                                       # delete all bq-test-* rows
 ```
 
