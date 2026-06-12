@@ -16,6 +16,7 @@ import {
   LoginPage,
   SettingsPage,
   ListsPage,
+  UsersPage,
 } from "./pages";
 import ImageRecognitionPage from "./pages/ImageRecognitionPage";
 import ModerateByIdPage from "./pages/ModerateByIdPage";
@@ -23,7 +24,7 @@ import ModerateByIdPage from "./pages/ModerateByIdPage";
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="system" switchable>
+      <ThemeProvider defaultTheme="light" switchable>
         <Toaster />
         <Routes>
           <Route element={<PublicLayout />}>
@@ -43,7 +44,9 @@ function App() {
               <Route path="/rules" element={<RulesPage />} />
               <Route path="/lists" element={<ListsPage />} />
               <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/users" element={<Navigate to="/settings?tab=team" replace />} />
+              <Route path="/team" element={<UsersPage />} />
+              {/* Legacy redirect — Team is now a first-class page. */}
+              <Route path="/users" element={<Navigate to="/team" replace />} />
               <Route path="/image-recognition" element={<ImageRecognitionPage />} />
               <Route path="/moderate-by-id" element={<ModerateByIdPage />} />
               {/* HIDDEN: Lab route — Automated Remediation hidden per Timur (2026-03-17) */}

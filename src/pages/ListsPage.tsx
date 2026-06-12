@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SectionLabel } from "@/components/ops";
 import { toast } from "sonner";
 
 type ListItem = {
@@ -838,6 +839,233 @@ function EditListDialog({
   );
 }
 
+/* ─── Regex / substring matcher for the tester ──────────────────── */
+function itemMatches(item: ListItem, text: string): boolean {
+  if (!text) return false;
+  try {
+    if (item.type === "regex") {
+      return new RegExp(item.pattern || item.value, item.flags || "i").test(text);
+    }
+    return text.toLowerCase().includes(item.value.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/* ─── List detail pane (master-detail right side) ───────────────── */
+function ListDetail({
+  list,
+  rules,
+  onEdit,
+  onDelete,
+}: {
+  list: ModerationList;
+  rules: any[];
+  onEdit: (l: ModerationList) => void;
+  onDelete: (l: ModerationList) => void;
+}) {
+  const [addItem] = useApiMutation(apiClient.lists.addItem);
+  const [removeItem] = useApiMutation(apiClient.lists.removeItem);
+  const [newValue, setNewValue] = useState("");
+  const [newType, setNewType] = useState<"exact" | "regex">("exact");
+  const [test, setTest] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const referencingRules = useMemo(
+    () =>
+      rules.filter((r: any) => {
+        const cfg = r.config || {};
+        return [cfg.listRef, cfg.excludeListRef, cfg.additionalListRef, cfg.watermarkListRef, cfg.excludeTitleListRef].includes(
+          list.name,
+        );
+      }),
+    [rules, list.name],
+  );
+
+  const matchCount = test ? list.items.filter((i) => itemMatches(i, test)).length : 0;
+  const shownItems = itemSearch
+    ? list.items.filter((i) => i.value.toLowerCase().includes(itemSearch.toLowerCase()))
+    : list.items;
+
+  const add = async () => {
+    if (!newValue.trim()) return;
+    const item: ListItem = { value: newValue.trim(), type: newType };
+    if (newType === "regex") {
+      const m = newValue.trim().match(/^\/(.+)\/([gimsuy]*)$/);
+      if (m) {
+        item.pattern = m[1];
+        item.flags = m[2] || undefined;
+      } else item.pattern = newValue.trim();
+    }
+    try {
+      await addItem({ id: list._id, item });
+      setNewValue("");
+      toast.success("Item added");
+    } catch (e: any) {
+      toast.error("Failed to add: " + e.message);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* header */}
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[17px] font-semibold">{list.displayName}</span>
+            <span className="inline-flex h-5 items-center rounded-[4px] border border-border bg-je-surface px-1.5 text-[10px] text-je-ink-2">
+              {list.category}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-[12.5px] text-je-ink-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 font-mono hover:text-je-ink"
+              title="Copy list name for rule config"
+              onClick={() => {
+                navigator.clipboard?.writeText(list.name);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+              {list.name}
+            </button>
+            <span>·</span>
+            <span className="num">{list.itemCount} items</span>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 rounded-none" onClick={() => onEdit(list)}>
+          <Pencil className="size-3.5" /> Edit
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 rounded-none text-je-error hover:text-je-error"
+          onClick={() => onDelete(list)}
+          aria-label="Delete list"
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
+
+      {/* used by N rules */}
+      <div>
+        <SectionLabel className="mb-1.5">Used by {referencingRules.length} rule{referencingRules.length === 1 ? "" : "s"}</SectionLabel>
+        {referencingRules.length === 0 ? (
+          <p className="text-[12px] text-je-ink-3">No rules reference this list.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {referencingRules.map((r: any) => (
+              <a
+                key={r._id}
+                href={`/rules?highlight=${encodeURIComponent(r.name)}`}
+                className="inline-flex h-5 items-center rounded-[4px] border border-border bg-background px-1.5 text-[11px] hover:border-je-teal hover:text-je-teal"
+              >
+                {r.displayName || r.name}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* regex tester */}
+      <div>
+        <SectionLabel className="mb-1.5">Test a title</SectionLabel>
+        <input
+          value={test}
+          onChange={(e) => setTest(e.target.value)}
+          placeholder="Paste a listing title to see which items match…"
+          className="h-9 w-full border border-border bg-background px-2.5 text-[12.5px] outline-none focus-visible:border-je-teal placeholder:text-je-ink-3"
+        />
+        {test && (
+          <p className="mt-1.5 text-[12px] text-je-ink-2">
+            {matchCount > 0 ? (
+              <span className="text-je-success">
+                ✓ matches {matchCount} item{matchCount === 1 ? "" : "s"}
+              </span>
+            ) : (
+              <span className="text-je-ink-3">No items match.</span>
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* items */}
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <SectionLabel>Items</SectionLabel>
+          <input
+            value={itemSearch}
+            onChange={(e) => setItemSearch(e.target.value)}
+            placeholder="Filter…"
+            className="h-7 w-40 border border-border bg-background px-2 text-[12px] outline-none focus-visible:border-je-teal placeholder:text-je-ink-3"
+          />
+        </div>
+        <div className="border border-border">
+          {shownItems.length === 0 ? (
+            <div className="px-3 py-3 text-[12px] text-je-ink-3">No items.</div>
+          ) : (
+            shownItems.map((item) => {
+              const realIdx = list.items.indexOf(item);
+              const matched = test && itemMatches(item, test);
+              return (
+                <div
+                  key={`${item.value}-${realIdx}`}
+                  className={`flex items-center gap-2 border-b border-border px-3 py-1.5 text-[12.5px] last:border-0 ${
+                    matched ? "bg-je-teal-bg shadow-[inset_2px_0_0_var(--je-teal)]" : ""
+                  }`}
+                >
+                  <span className={`font-mono ${item.type === "regex" ? "text-je-teal" : ""}`}>{item.value}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-je-ink-3">{item.type}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${item.value}`}
+                    className="ml-auto text-je-ink-3 hover:text-je-error"
+                    onClick={async () => {
+                      try {
+                        await removeItem({ id: list._id, itemIndex: realIdx });
+                        toast.success("Item removed");
+                      } catch (e: any) {
+                        toast.error("Failed to remove: " + e.message);
+                      }
+                    }}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+        {/* add item */}
+        <div className="mt-2 flex gap-2">
+          <input
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder={newType === "regex" ? "/pattern/i or pattern" : "New item value"}
+            className="h-8 flex-1 border border-border bg-background px-2.5 text-[12.5px] outline-none focus-visible:border-je-teal placeholder:text-je-ink-3"
+          />
+          <Select value={newType} onValueChange={(v) => setNewType(v as "exact" | "regex")}>
+            <SelectTrigger size="sm" className="h-8! w-auto rounded-none border-border text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-none">
+              <SelectItem value="exact" className="rounded-none text-[12px]">exact</SelectItem>
+              <SelectItem value="regex" className="rounded-none text-[12px]">regex</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" className="h-8 rounded-none" onClick={add} disabled={!newValue.trim()}>
+            <Plus className="size-3.5" /> Add
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ListsPage() {
   const { data: listsData } = useApiQuery(apiClient.lists.list);
   const lists = listsData as ModerationList[] | undefined;
@@ -851,6 +1079,7 @@ export default function ListsPage() {
   const [editList, setEditList] = useState<ModerationList | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [seeding, setSeeding] = useState(false); // kept for empty state seeding
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     if (!lists) return [];
@@ -931,119 +1160,96 @@ export default function ListsPage() {
     );
   }
 
+  const selectedList =
+    (selectedListId ? filteredLists.find((l) => l._id === selectedListId) : null) ?? filteredLists[0] ?? null;
+
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <List className="size-6" />
-            Moderation Lists
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {lists.length} lists • {totalItems.toLocaleString()} total items • Referenced by rules for pattern matching
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="size-3.5 mr-1" />
-            Export JSON
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Topbar */}
+      <div className="flex items-center gap-3.5 border-b border-border px-6 py-3.5">
+        <h1 className="text-[18px] font-semibold tracking-tight">Lists</h1>
+        <span className="text-[12px] text-je-ink-2">
+          {lists.length} lists · {totalItems.toLocaleString()} items
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-[30px] gap-1.5 rounded-none" onClick={handleExport}>
+            <Download className="size-3.5" /> Export
           </Button>
-          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="size-3.5 mr-1" />
-            New List
+          <Button size="sm" className="h-[30px] gap-1.5 rounded-none" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="size-3.5" /> New list
           </Button>
         </div>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Total Lists", value: lists.length },
-          { label: "Total Items", value: totalItems.toLocaleString() },
-          { label: "Categories", value: categories.length },
-          {
-            label: "Used by Rules",
-            value: lists.filter((l) =>
-              rules.some(
-                (r: any) =>
-                  r.config?.listRef === l.name ||
-                  r.config?.excludeListRef === l.name ||
-                  r.config?.additionalListRef === l.name ||
-                  r.config?.watermarkListRef === l.name ||
-                  r.config?.excludeTitleListRef === l.name
-              )
-            ).length,
-          },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="p-3">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p className="text-xl font-bold">{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search lists..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9"
-          />
+      {lists.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-16 text-center">
+          <List className="size-10 text-je-ink-3" />
+          <p className="text-[15px] font-medium">No lists yet</p>
+          <Button className="mt-2 rounded-none" onClick={handleSeed} disabled={seeding}>
+            {seeding && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Seed default lists
+          </Button>
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-52 h-9">
-            <SelectValue placeholder="All categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_1fr]">
+          {/* Index */}
+          <div className="hidden min-h-0 flex-col overflow-hidden border-r border-border lg:flex">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+              <Search className="size-3.5 text-je-ink-3" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search lists…"
+                className="h-7 w-full bg-transparent text-[12.5px] outline-none placeholder:text-je-ink-3"
+              />
+            </div>
+            <div className="border-b border-border px-3 py-2">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger size="sm" className="h-7! w-full rounded-none border-border text-[12px]">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none">
+                  <SelectItem value="all" className="rounded-none text-[12px]">All categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat} className="rounded-none text-[12px]">{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {filteredLists.map((l) => {
+                const sel = selectedList?._id === l._id;
+                return (
+                  <button
+                    type="button"
+                    key={l._id}
+                    onClick={() => setSelectedListId(l._id)}
+                    className={`flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left ${
+                      sel ? "bg-je-teal-bg shadow-[inset_2px_0_0_var(--je-teal)]" : "hover:bg-je-surface"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12.5px] font-medium">{l.displayName}</div>
+                      <div className="truncate font-mono text-[10.5px] text-je-ink-3">{l.name}</div>
+                    </div>
+                    <span className="num text-[11px] text-je-ink-2">{l.itemCount}</span>
+                  </button>
+                );
+              })}
+              {filteredLists.length === 0 && (
+                <p className="px-3 py-6 text-center text-[12px] text-je-ink-3">No lists match.</p>
+              )}
+            </div>
+          </div>
 
-      {/* No Lists State */}
-      {lists.length === 0 && (
-        <Card className="py-12">
-          <CardContent className="text-center">
-            <List className="size-12 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-1">No lists yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Seed the default moderation lists to get started
-            </p>
-            <Button onClick={handleSeed} disabled={seeding}>
-              {seeding && <Loader2 className="size-4 animate-spin mr-2" />}
-              Seed Default Lists
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* List Grid */}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {filteredLists.map((list) => (
-          <ListCard
-            key={list._id}
-            list={list}
-            rules={rules}
-            onEdit={(l) => setEditList(l)}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
-
-      {filteredLists.length === 0 && lists.length > 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          <p>No lists match your search</p>
+          {/* Detail */}
+          <div className="min-h-0 overflow-y-auto p-6">
+            {selectedList ? (
+              <ListDetail list={selectedList} rules={rules} onEdit={(l) => setEditList(l)} onDelete={handleDelete} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-je-ink-3">Select a list</div>
+            )}
+          </div>
         </div>
       )}
 

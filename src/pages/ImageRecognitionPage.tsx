@@ -805,7 +805,7 @@ function ManualImageAnalysis() {
 
 export default function ImageRecognitionPage() {
   return (
-    <div className="space-y-8">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

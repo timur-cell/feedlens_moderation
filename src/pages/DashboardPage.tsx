@@ -1,636 +1,345 @@
-import { jeImageUrl } from "@/components/JeImage";
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  TrendingUp,
-  Loader2,
-  AlertTriangle,
-  Download,
-  Calendar,
-  Bot,
-  ExternalLink,
-  Eye,
-  Image as ImageIcon,
-} from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Download, Loader2, TriangleAlert } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { PrecisionBar, SectionLabel, Sparkline } from "@/components/ops";
+import { formatAge, rulePrecision } from "@/lib/queueFormat";
 
-// ─── Date Range Presets ─────────────────────────────────────────
+// Overview — "is the queue healthy and is automation trustworthy, at a glance".
+// Three bands: queue health · automation quality · needs attention. No recent-
+// decisions list (that's the Decisions page).
 
-const DATE_PRESETS = [
-  { label: "Today", days: 0 },
-  { label: "Last 7 days", days: 7 },
-  { label: "Last 14 days", days: 14 },
-  { label: "Last 30 days", days: 30 },
-  { label: "Last 90 days", days: 90 },
-  { label: "All time", days: -1 },
+const RANGES = [
+  { key: "24h", label: "24h", days: 1 },
+  { key: "7d", label: "7d", days: 7 },
+  { key: "30d", label: "30d", days: 30 },
 ];
 
-function getDateRange(days: number): { start?: number; end?: number; label: string } {
-  if (days === -1) return { label: "All time" };
+function rangeBounds(days: number) {
   const end = Date.now();
-  const start = days === 0
-    ? new Date().setHours(0, 0, 0, 0)
-    : end - days * 24 * 60 * 60 * 1000;
-  return { start, end, label: days === 0 ? "Today" : `Last ${days} days` };
+  return { start: end - days * 86_400_000, end };
 }
-
-// ─── Stat Card with Auto/Manual Split ───────────────────────────
 
 function StatCard({
-  title,
+  label,
   value,
-  icon: Icon,
+  sub,
+  spark,
   color,
-  autoCount,
-  manualCount,
-  showRate,
-  rateValue,
-  href,
+  alert,
 }: {
-  title: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  autoCount?: number;
-  manualCount?: number;
-  showRate?: boolean;
-  rateValue?: string;
-  href?: string;
+  label: string;
+  value: string;
+  sub?: string;
+  spark?: number[];
+  color?: string;
+  alert?: boolean;
 }) {
-  const autoPercent = value > 0 && autoCount !== undefined
-    ? ((autoCount / value) * 100).toFixed(1)
-    : null;
-  const manualPercent = value > 0 && manualCount !== undefined
-    ? ((manualCount / value) * 100).toFixed(1)
-    : null;
-
-  const content = (
-    <Card className={`${href ? "hover:shadow-md transition-shadow cursor-pointer" : ""} relative overflow-hidden`}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className="flex items-center gap-2">
-          {showRate && rateValue && (
-            <span className={`text-lg font-bold ${color}`}>{rateValue}</span>
-          )}
-          <Icon className={`size-5 ${color}`} />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value.toLocaleString()}</div>
-        {/* Auto vs Manual split */}
-        {autoCount !== undefined && manualCount !== undefined && value > 0 && (
-          <div className="mt-2 space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Bot className="size-3" />Automation
-              </span>
-              <span className="font-medium tabular-nums">
-                {autoCount.toLocaleString()}
-                <span className="text-muted-foreground ml-1.5">{autoPercent}%</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Manual</span>
-              <span className="font-medium tabular-nums">
-                {manualCount.toLocaleString()}
-                <span className="text-muted-foreground ml-1.5">{manualPercent}%</span>
-              </span>
-            </div>
-            {/* Mini progress bar */}
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
-              {autoCount > 0 && (
-                <div
-                  className="h-full bg-emerald-500 rounded-l-full transition-all"
-                  style={{ width: `${autoPercent}%` }}
-                />
-              )}
-              {manualCount > 0 && (
-                <div
-                  className="h-full bg-amber-500 rounded-r-full transition-all"
-                  style={{ width: `${manualPercent}%` }}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  if (href) return <Link to={href}>{content}</Link>;
-  return content;
-}
-
-function RecentActivity() {
-  const { data: results } = useApiQuery(apiClient.moderation.recent, {
-    limit: 10,
-  });
-  const { data: listings } = useApiQuery(apiClient.listings.recent, {
-    limit: 50,
-  });
-  const [previewId, setPreviewId] = useState<string | null>(null);
-
-  if (!results || !listings) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Decisions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex justify-center py-8">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (results.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Decisions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <TrendingUp className="size-8 mx-auto mb-2 opacity-50" />
-            <p>No moderation activity yet.</p>
-            <p className="text-sm mt-1">Send listings via the API to start moderating.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const listingMap = new Map(listings.map((l: any) => [l._id, l]));
-
-  const outcomeConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
-    approved: { label: "Approved", variant: "default", color: "bg-emerald-500" },
-    rejected: { label: "Rejected", variant: "destructive", color: "bg-red-500" },
-    notice: { label: "Notice", variant: "secondary", color: "bg-sky-500" },
-    manual: { label: "Manual", variant: "outline", color: "bg-amber-500" },
-  };
-
-  const previewResult = previewId ? results.find((r: any) => r._id === previewId) : null;
-  const previewListing = previewResult ? listingMap.get(previewResult.listingId) : null;
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">Recent Decisions</CardTitle>
-        <Link to="/moderation-log">
-          <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
-            View all <ExternalLink className="size-3" />
-          </Button>
-        </Link>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-0">
-          {results.map((r: any) => {
-            const listing = listingMap.get(r.listingId);
-            const config = outcomeConfig[r.outcome] || outcomeConfig.manual;
-            const timeAgo = getTimeAgo(r.processedAt);
-            const isPreview = previewId === r._id;
-            const thumbUrl = listing?.imageUrls?.[0];
-
-            return (
-              <div key={r._id}>
-                <div
-                  className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-lg cursor-pointer transition-colors border-b last:border-0 ${
-                    isPreview ? "bg-muted" : "hover:bg-muted/50"
-                  }`}
-                  onClick={() => setPreviewId(isPreview ? null : r._id)}
-                >
-                  {/* Thumbnail */}
-                  <div className="size-9 rounded overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                    {thumbUrl ? (
-                      <img
-                        src={jeImageUrl(thumbUrl)}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <ImageIcon className="size-3.5 text-muted-foreground/40" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {listing?.title || `Listing ${r.jeId}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {listing?.country && `${listing.city ? listing.city + ", " : ""}${listing.country}`}
-                      {listing?.priceUsd && ` · $${listing.priceUsd.toLocaleString()}`}
-                      {r.llmTriggered && " · 🤖 LLM"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={config.variant} className="text-xs">
-                      {config.label}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{timeAgo}</span>
-                  </div>
-                </div>
-
-                {/* Inline preview panel */}
-                {isPreview && previewListing && (
-                  <div className="mx-1 mb-2 p-3 bg-muted/30 border rounded-lg space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                    {/* Image gallery */}
-                    {previewListing.imageUrls?.length > 0 && (
-                      <div className="flex gap-1.5 overflow-x-auto pb-1">
-                        {previewListing.imageUrls.slice(0, 6).map((url: string, i: number) => (
-                          <img
-                            key={i}
-                            src={jeImageUrl(url)}
-                            alt=""
-                            className="h-16 w-24 rounded object-cover shrink-0 border"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = "none";
-                            }}
-                          />
-                        ))}
-                        {previewListing.imageUrls.length > 6 && (
-                          <div className="h-16 w-24 rounded bg-muted flex items-center justify-center shrink-0 border text-xs text-muted-foreground">
-                            +{previewListing.imageUrls.length - 6}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Key data points */}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">JE ID</span>
-                        <a
-                          href={`https://www.jamesedition.com/admin/listings/${previewListing.jeId}/edit`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline font-mono"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {previewListing.jeId}
-                        </a>
-                      </div>
-                      {previewListing.category && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Category</span>
-                          <span>{previewListing.category}</span>
-                        </div>
-                      )}
-                      {previewListing.realEstateType && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Type</span>
-                          <span>{previewListing.realEstateType}</span>
-                        </div>
-                      )}
-                      {previewListing.office && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Office</span>
-                          <span className="truncate ml-2">{previewListing.office}</span>
-                        </div>
-                      )}
-                      {previewListing.lqi != null && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">LQI</span>
-                          <span>{previewListing.lqi.toFixed(0)}%</span>
-                        </div>
-                      )}
-                      {previewListing.imageCount != null && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Images</span>
-                          <span>{previewListing.imageCount}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Rule matches */}
-                    {previewResult?.ruleMatches?.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">Rules matched</p>
-                        <div className="flex flex-wrap gap-1">
-                          {previewResult.ruleMatches.map((m: any, i: number) => (
-                            <Link
-                              key={i}
-                              to={`/rules?highlight=${encodeURIComponent(m.ruleName)}`}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Badge
-                                variant={m.action === "reject" ? "destructive" : "secondary"}
-                                className="text-[10px] cursor-pointer hover:opacity-80"
-                              >
-                                {m.ruleName}
-                              </Badge>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 pt-1 border-t">
-                      <Link
-                        to="/moderation-log"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1"
-                      >
-                        <Button variant="outline" size="sm" className="w-full text-xs gap-1 h-7">
-                          <Eye className="size-3" />
-                          View in Log
-                        </Button>
-                      </Link>
-                      {previewResult?.outcome === "manual" && (
-                        <Link
-                          to="/queue"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1"
-                        >
-                          <Button variant="default" size="sm" className="w-full text-xs gap-1 h-7">
-                            Review in Queue
-                          </Button>
-                        </Link>
-                      )}
-                      {previewListing.listingUrl && (
-                        <a
-                          href={previewListing.listingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
-                            <ExternalLink className="size-3" />
-                            JE
-                          </Button>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`flex-1 border border-border px-4 py-3.5 ${alert ? "border-t-2 border-t-je-error" : ""}`}>
+      <SectionLabel>{label}</SectionLabel>
+      <div className="mt-2 flex items-end justify-between">
+        <span className={`num text-[26px] font-semibold leading-none ${alert ? "text-je-error" : ""}`}>{value}</span>
+        {spark && spark.length > 1 && <Sparkline points={spark} width={84} height={26} color={color || "var(--je-ink)"} fill />}
+      </div>
+      {sub && <div className="mt-1.5 text-[11.5px] text-je-ink-2">{sub}</div>}
+    </div>
   );
 }
 
-function getTimeAgo(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
+function pct(n: number, d: number): number {
+  return d > 0 ? Math.round((n / d) * 1000) / 10 : 0;
 }
-
-// ─── Rule Performance ───────────────────────────────────────────
-
-function RulePerformance() {
-  const { data: rules } = useApiQuery(apiClient.rules.list);
-
-  if (!rules) return null;
-
-  const activeRules = rules
-    .filter((r: any) => r.enabled && (r.matchCount || 0) > 0)
-    .sort((a: any, b: any) => (b.matchCount || 0) - (a.matchCount || 0))
-    .slice(0, 8);
-
-  if (activeRules.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Top Rules by Matches</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <AlertTriangle className="size-6 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No rule matches yet</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Top Rules by Matches</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {activeRules.map((rule: any) => {
-            const fpRate = rule.falsePositiveCount && rule.matchCount
-              ? Math.round((rule.falsePositiveCount / rule.matchCount) * 100)
-              : 0;
-            return (
-              <Link
-                key={rule._id}
-                to={`/rules?highlight=${encodeURIComponent(rule.name)}`}
-                className="flex items-center gap-3 hover:bg-muted/50 rounded p-1 -mx-1 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{rule.displayName}</p>
-                  <div className="flex gap-2 text-xs text-muted-foreground">
-                    <span>{rule.matchCount} matches</span>
-                    {fpRate > 0 && (
-                      <span className="text-amber-600">{fpRate}% FP</span>
-                    )}
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs shrink-0">
-                  {rule.tier}
-                </Badge>
-              </Link>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── CSV Export Helper ──────────────────────────────────────────
 
 function downloadCSV(data: any[]) {
   if (!data || data.length === 0) return;
   const headers = Object.keys(data[0]);
   const csv = [
     headers.join(","),
-    ...data.map((row) =>
-      headers
-        .map((h) => {
-          const val = String(row[h] ?? "").replace(/"/g, '""');
-          return `"${val}"`;
-        })
-        .join(",")
-    ),
+    ...data.map((row) => headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(",")),
   ].join("\n");
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `feedlens-export-${new Date().toISOString().split("T")[0]}.csv`;
+  a.download = `feedlens-decisions-${new Date().toISOString().split("T")[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-// ─── Main Dashboard ─────────────────────────────────────────────
-
 export default function DashboardPage() {
-  const [selectedPreset, setSelectedPreset] = useState(5); // "All time" index
-  const range = useMemo(() => getDateRange(DATE_PRESETS[selectedPreset].days), [selectedPreset]);
+  const [rangeKey, setRangeKey] = useState("7d");
+  const range = RANGES.find((r) => r.key === rangeKey)!;
+  const bounds = useMemo(() => rangeBounds(range.days), [range.days]);
 
-  const { data: dashData, error: dashError, refetch: refetchDash } = useApiQuery(apiClient.dashboard.stats, {
-    startDate: range.start,
-    endDate: range.end,
+  const { data: dashData, error, refetch } = useApiQuery(apiClient.dashboard.stats, {
+    startDate: bounds.start,
+    endDate: bounds.end,
   });
-
+  const { data: queueStats } = useApiQuery(apiClient.listings.stats, undefined, { pollMs: 30000 });
+  const { data: pending } = useApiQuery(apiClient.listings.pending);
+  const { data: rules } = useApiQuery(apiClient.rules.list);
   const { data: exportData } = useApiQuery(apiClient.dashboard.exportCsv, {
-    startDate: range.start,
-    endDate: range.end,
+    startDate: bounds.start,
+    endDate: bounds.end,
   });
 
-  const handleExport = useCallback(() => {
-    if (exportData) downloadCSV(exportData);
-  }, [exportData]);
+  const handleExport = useCallback(() => exportData && downloadCSV(exportData), [exportData]);
 
-  if (dashError && !dashData) {
+  const daily: any[] = dashData?.dailyData || [];
+  const resolvedSeries = daily.map(
+    (d) => d.approvedAuto + d.approvedManual + d.rejectedAuto + d.rejectedManual + d.noticedAuto + d.noticedManual,
+  );
+  const intakeSeries = daily.map((d) => d.total);
+  const queueSeries = daily.map((d) => d.manualQueue);
+  const autoSeries = daily.map((d) => {
+    const auto = d.approvedAuto + d.rejectedAuto + d.noticedAuto;
+    return d.total > 0 ? Math.round((auto / d.total) * 100) : 0;
+  });
+  const overrideSeries = daily.map((d) => {
+    const manual = d.approvedManual + d.rejectedManual + d.noticedManual;
+    return d.total > 0 ? Math.round((manual / d.total) * 100) : 0;
+  });
+
+  // SLA: pending listings older than 24h.
+  const SLA_HOURS = 24;
+  const oldest = (pending || []).reduce((max: number, l: any) => Math.min(max, l.importedAt || Date.now()), Date.now());
+  const overSla = (pending || []).filter((l: any) => Date.now() - (l.importedAt || Date.now()) > SLA_HOURS * 3_600_000);
+
+  // Long-disabled rules (30d+).
+  const disabledStale = (rules || []).filter(
+    (r: any) => !r.enabled && r.lastModifiedAt && Date.now() - r.lastModifiedAt > 30 * 86_400_000,
+  );
+
+  const topRules = (rules || [])
+    .filter((r: any) => (r.matchCount || 0) > 0)
+    .sort((a: any, b: any) => (b.matchCount || 0) - (a.matchCount || 0))
+    .slice(0, 5);
+
+  if (error && !dashData) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
-        <p className="text-sm">Failed to load dashboard stats: {dashError.message}</p>
-        <Button variant="outline" size="sm" onClick={() => refetchDash()}>Retry</Button>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+        <p className="text-sm text-je-ink-2">Failed to load overview: {error.message}</p>
+        <Button variant="outline" size="sm" className="rounded-none" onClick={() => refetch()}>
+          Retry
+        </Button>
       </div>
     );
   }
-
   if (!dashData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-1 items-center justify-center p-12">
+        <Loader2 className="size-7 animate-spin text-je-ink-3" />
       </div>
     );
   }
 
-  const { stats } = dashData;
-  const approvalRate = stats.total > 0 ? ((stats.approved / stats.total) * 100).toFixed(1) : "0";
-  const refusalRate = stats.total > 0 ? ((stats.rejected / stats.total) * 100).toFixed(1) : "0";
+  const s = dashData.stats;
+  const resolvedTotal = resolvedSeries.reduce((a, b) => a + b, 0);
+  const intakeTotal = intakeSeries.reduce((a, b) => a + b, 0);
+  const automationRate = pct(s.autoTotal, s.total);
+  const overrideRate = pct(s.manualTotal, s.total);
+  const autoRejectShare = pct(s.autoRejected, s.total);
+  const autoApproveShare = pct(s.autoApproved, s.total);
+  const perDay = daily.length > 0 ? Math.round((resolvedTotal / daily.length) * 10) / 10 : 0;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header with date picker + export */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Moderation Statistics</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {stats.total > 0
-              ? `${approvalRate}% approval rate · ${stats.autoTotal.toLocaleString()} automated decisions`
-              : "No moderation data yet"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Date range picker */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Calendar className="size-4" />
-                {range.label}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48 p-1" align="end">
-              {DATE_PRESETS.map((preset, idx) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
-                    selectedPreset === idx
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                  }`}
-                  onClick={() => setSelectedPreset(idx)}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
-
-          {/* Export button */}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Topbar */}
+      <div className="flex items-center gap-3.5 border-b border-border px-6 py-3.5">
+        <h1 className="text-[18px] font-semibold tracking-tight">Overview</h1>
+        <span className="text-[12px] text-je-ink-2">
+          {s.total.toLocaleString()} decisions · {automationRate}% automated
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex h-[30px] items-center border border-border text-[12px]">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={`flex h-full items-center border-l border-border px-3 first:border-l-0 ${
+                  rangeKey === r.key ? "bg-je-ink font-medium text-background" : "text-je-ink-2"
+                }`}
+                onClick={() => setRangeKey(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
           <Button
-            variant="default"
+            variant="outline"
             size="sm"
-            className="gap-2 bg-red-500 hover:bg-red-600 text-white"
+            className="h-[30px] gap-1.5 rounded-none"
             onClick={handleExport}
             disabled={!exportData || exportData.length === 0}
           >
-            <Download className="size-4" />
-            Export
+            <Download className="size-3.5" /> Export
           </Button>
         </div>
       </div>
 
-      {/* Stat cards with auto/manual split */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="TOTAL MODERATED"
-          value={stats.total}
-          icon={TrendingUp}
-          color="text-slate-500"
-          autoCount={stats.autoTotal}
-          manualCount={stats.manualTotal}
-        />
-        <StatCard
-          title="APPROVED"
-          value={stats.approved}
-          icon={CheckCircle2}
-          color="text-emerald-500"
-          autoCount={stats.autoApproved}
-          manualCount={stats.manualApproved}
-          showRate
-          rateValue={`${approvalRate}%`}
-        />
-        <StatCard
-          title="REFUSED"
-          value={stats.rejected}
-          icon={XCircle}
-          color="text-red-500"
-          autoCount={stats.autoRejected}
-          manualCount={stats.manualRejected}
-          showRate
-          rateValue={`${refusalRate}%`}
-        />
-        <StatCard
-          title="MANUAL QUEUE"
-          value={stats.manual}
-          icon={Clock}
-          color="text-amber-500"
-          href="/queue"
-        />
-      </div>
+      {/* Attention banner */}
+      {overSla.length > 0 && (
+        <div className="flex items-center gap-2.5 border-b border-border border-t-2 border-t-je-warning-raw bg-je-warning-bg px-6 py-2 text-[12px]">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-je-warning">
+            <TriangleAlert className="size-3.5" /> SLA
+          </span>
+          <span>
+            <strong>{overSla.length}</strong> listing{overSla.length === 1 ? "" : "s"} past the {SLA_HOURS}h review SLA —
+            oldest waiting {formatAge(oldest)}.
+          </span>
+          <Link to="/queue" className="ml-auto font-medium text-je-teal hover:underline">
+            View in Queue →
+          </Link>
+        </div>
+      )}
 
-      {/* Bottom section: Recent + Rule Performance */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentActivity />
-        </div>
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+        {/* Queue health */}
         <div>
-          <RulePerformance />
+          <SectionLabel className="mb-2">Queue health</SectionLabel>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <StatCard
+              label="In queue now"
+              value={(queueStats?.manual ?? (pending || []).length).toLocaleString()}
+              sub="awaiting human review"
+              spark={queueSeries}
+            />
+            <StatCard
+              label="Oldest wait"
+              value={pending && pending.length ? formatAge(oldest) : "—"}
+              sub={`SLA ${SLA_HOURS}h · ${overSla.length} over`}
+              alert={overSla.length > 0}
+              color="var(--je-error)"
+              spark={queueSeries}
+            />
+            <StatCard
+              label={`Resolved · ${range.label}`}
+              value={resolvedTotal.toLocaleString()}
+              sub={`vs ${intakeTotal.toLocaleString()} intake`}
+              color="var(--je-success)"
+              spark={resolvedSeries}
+            />
+            <StatCard label="Decisions / day" value={`${perDay}`} sub={`over ${daily.length} day${daily.length === 1 ? "" : "s"}`} spark={resolvedSeries} />
+          </div>
+        </div>
+
+        {/* Automation quality */}
+        <div>
+          <SectionLabel className="mb-2">Automation quality</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
+            <div className="flex flex-col gap-3">
+              <StatCard label="Automation rate" value={`${automationRate}%`} sub={`${s.autoTotal} of ${s.total} automated`} color="var(--je-teal)" spark={autoSeries} />
+              <StatCard label="Override rate" value={`${overrideRate}%`} sub={`${s.manualTotal} human overrides`} color="var(--je-success)" spark={overrideSeries} />
+            </div>
+            <div className="flex flex-col gap-3">
+              <StatCard label="Auto-reject share" value={`${autoRejectShare}%`} sub={`${s.autoRejected} auto rejections`} />
+              <StatCard label="Auto-approve share" value={`${autoApproveShare}%`} sub={`${s.autoApproved} auto approvals`} color="var(--je-success)" />
+            </div>
+            <div className="border border-border px-4 py-3.5">
+              <div className="flex items-baseline justify-between">
+                <SectionLabel>Top rules · {range.label}</SectionLabel>
+                <Link to="/rules" className="text-[11.5px] font-medium text-je-teal hover:underline">
+                  All rules →
+                </Link>
+              </div>
+              {topRules.length === 0 ? (
+                <p className="mt-3 text-[12px] text-je-ink-3">No rule matches in range.</p>
+              ) : (
+                <table className="mt-2 w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-je-ink text-[10px] uppercase tracking-[0.09em] text-je-ink-2">
+                      <th className="py-1.5 pr-3 text-left font-semibold">Rule</th>
+                      <th className="py-1.5 text-right font-semibold">Matches</th>
+                      <th className="py-1.5 pl-3 text-left font-semibold">Precision</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topRules.map((r: any) => (
+                      <tr key={r._id} className="border-b border-border last:border-0">
+                        <td className="max-w-[180px] truncate py-1.5 pr-3">
+                          <Link to={`/rules?highlight=${encodeURIComponent(r.name)}`} className="hover:underline">
+                            {r.displayName || r.name}
+                          </Link>
+                        </td>
+                        <td className="num py-1.5 text-right font-medium">{r.matchCount}</td>
+                        <td className="py-1.5 pl-3">
+                          <PrecisionBar pct={rulePrecision(r)} width={56} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <div className="mt-2 text-[11.5px] text-je-ink-2">Precision = 1 − override rate. Low-precision rules are shadow-review candidates.</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Needs attention */}
+        <div>
+          <SectionLabel className="mb-2">Needs attention</SectionLabel>
+          <div className="border border-border">
+            {overSla.length === 0 && disabledStale.length === 0 ? (
+              <div className="px-4 py-3 text-[12.5px] text-je-ink-2">Nothing needs attention — queue is within SLA.</div>
+            ) : (
+              <>
+                {overSla.length > 0 && (
+                  <AttentionRow
+                    dot="error"
+                    head={`${overSla.length} listing${overSla.length === 1 ? "" : "s"} over ${SLA_HOURS}h SLA`}
+                    detail={`oldest waiting ${formatAge(oldest)}`}
+                    cta="Open in Queue →"
+                    to="/queue"
+                  />
+                )}
+                {disabledStale.length > 0 && (
+                  <AttentionRow
+                    dot="warn"
+                    head={`${disabledStale.length} rule${disabledStale.length === 1 ? "" : "s"} disabled 30+ days`}
+                    detail={disabledStale
+                      .slice(0, 3)
+                      .map((r: any) => r.name)
+                      .join(", ")}
+                    cta="Review in Rules →"
+                    to="/rules"
+                    last
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AttentionRow({
+  dot,
+  head,
+  detail,
+  cta,
+  to,
+  last,
+}: {
+  dot: "error" | "warn";
+  head: string;
+  detail: string;
+  cta: string;
+  to: string;
+  last?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-2.5 px-4 py-2.5 text-[12.5px] ${last ? "" : "border-b border-border"}`}>
+      <span className={`size-[5px] shrink-0 rounded-full ${dot === "error" ? "bg-je-error" : "bg-je-warning-raw"}`} />
+      <span className="font-medium">{head}</span>
+      <span className="text-je-ink-2">{detail}</span>
+      <Link to={to} className="ml-auto shrink-0 font-medium text-je-teal hover:underline">
+        {cta}
+      </Link>
     </div>
   );
 }

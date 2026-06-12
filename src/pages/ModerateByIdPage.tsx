@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Search,
   Loader2,
@@ -610,7 +610,8 @@ function ResultCard({ result }: { result: ModerationResult }) {
 
 export default function ModerateByIdPage() {
   const [fetchAndModerate] = useApiMutation(apiClient.moderateById.run);
-  const [inputText, setInputText] = useState("");
+  const [searchParams] = useSearchParams();
+  const [inputText, setInputText] = useState(() => searchParams.get("q") || "");
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ModerationResponse | null>(null);
   const [processedCount, setProcessedCount] = useState(0);
@@ -648,7 +649,7 @@ export default function ModerateByIdPage() {
   const exampleUrls = "https://www.jamesedition.com/real_estate/.../listing-title-17403824\nhttps://www.jamesedition.com/yachts/.../listing-title-17400061";
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="p-6 space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold">Moderate by URL</h1>
         <p className="text-muted-foreground mt-1">

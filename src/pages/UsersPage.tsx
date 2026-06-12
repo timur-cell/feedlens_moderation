@@ -659,52 +659,21 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
+      {/* Header — Team is a first-class page now (was a Settings tab). */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="size-6" />
-            Users
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage moderators who can review and act on listings
+          <h1 className="text-[20px] font-semibold tracking-tight">Team</h1>
+          <p className="text-je-ink-2 text-[13px] mt-0.5">
+            {stats
+              ? `${stats.total} people · ${stats.active} active · ${stats.invited} invited · ${stats.admins} admins`
+              : "Moderators who review and act on listings"}
           </p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
+        <Button className="rounded-none" onClick={() => setAddDialogOpen(true)}>
           <UserPlus className="size-4 mr-2" />
-          Add User
+          Add user
         </Button>
       </div>
-
-      {/* Stats cards */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Total Users</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-emerald-600">{stats.active}</div>
-              <div className="text-xs text-muted-foreground">Active</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-amber-600">{stats.invited}</div>
-              <div className="text-xs text-muted-foreground">Invited</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-violet-600">{stats.admins}</div>
-              <div className="text-xs text-muted-foreground">Admins</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Filter */}
       <div className="flex gap-2">
