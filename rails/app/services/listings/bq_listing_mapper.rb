@@ -35,8 +35,8 @@ module Listings
         land_area: row[:land_area],
         image_count: row[:image_count],
         image_urls: Array(row[:image_urls]).presence,
-        avg_image_width: row[:avg_image_width],
-        avg_image_height: row[:avg_image_height],
+        avg_image_width: row[:avg_image_width]&.round,
+        avg_image_height: row[:avg_image_height]&.round,
         # listing_quality_score.score is 0-1; the seeded lqi rules expect 0-100.
         lqi: row[:lqi_score] && (row[:lqi_score] * 100.0).round(2),
         description: description && description[0, MAX_DESCRIPTION_LENGTH],

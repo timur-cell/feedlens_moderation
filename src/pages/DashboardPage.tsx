@@ -495,7 +495,7 @@ export default function DashboardPage() {
   const [selectedPreset, setSelectedPreset] = useState(5); // "All time" index
   const range = useMemo(() => getDateRange(DATE_PRESETS[selectedPreset].days), [selectedPreset]);
 
-  const { data: dashData } = useApiQuery(apiClient.dashboard.stats, {
+  const { data: dashData, error: dashError, refetch: refetchDash } = useApiQuery(apiClient.dashboard.stats, {
     startDate: range.start,
     endDate: range.end,
   });
@@ -508,6 +508,15 @@ export default function DashboardPage() {
   const handleExport = useCallback(() => {
     if (exportData) downloadCSV(exportData);
   }, [exportData]);
+
+  if (dashError && !dashData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+        <p className="text-sm">Failed to load dashboard stats: {dashError.message}</p>
+        <Button variant="outline" size="sm" onClick={() => refetchDash()}>Retry</Button>
+      </div>
+    );
+  }
 
   if (!dashData) {
     return (

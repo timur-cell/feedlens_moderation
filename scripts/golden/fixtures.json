@@ -611,7 +611,7 @@
       "label": "commercial_title_needs_llm",
       "note": "listRef regex hit, excludeListRef misses",
       "listing": { "jeId": "g031", "title": "Commercial Building in central Madrid", "description": "Prime city-center premises with high foot traffic and excellent access.", "country": "ES", "priceUsd": 2500000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 80, "realEstateType": "other" },
-      "expect": { "outcome": "needs_llm", "mustMatch": [ "commercial_properties_title", "commercial_properties_23" ] }
+      "expect": { "outcome": "needs_llm", "mustMatch": [ "commercial_properties_title" ], "mustNotMatch": [ "commercial_properties_23" ] }
     },
     {
       "label": "commercial_excluded_by_residential",

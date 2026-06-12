@@ -3,7 +3,10 @@ module Api
   # them. Mirrors convex/fetchListing.ts fetchAndModerate.
   class ModerateByIdController < BaseController
     def create
-      inputs = Array(params[:inputs]).map(&:to_s)
+      inputs = Array(params[:inputs]).map(&:to_s).reject(&:blank?)
+      if inputs.empty?
+        return render json: { error: "inputs array required" }, status: :unprocessable_entity
+      end
 
       if ActiveModel::Type::Boolean.new.cast(params[:async])
         result = Listings::FetchAndModerate.enqueue(inputs: inputs, moderator: current_moderator)

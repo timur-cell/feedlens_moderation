@@ -797,7 +797,8 @@
     "description"
    ]
   },
-  "sellerMessage": "JamesEdition is a luxury residential marketplace. Commercial properties are not accepted on our platform."
+  "sellerMessage": "JamesEdition is a luxury residential marketplace. Commercial properties are not accepted on our platform.",
+  "enabled": false
  },
  {
   "name": "commercial_body_other",
