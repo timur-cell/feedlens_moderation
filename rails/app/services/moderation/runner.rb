@@ -1,14 +1,39 @@
 module Moderation
   # Orchestrates a full moderation run for a listing: AI parameter scan,
   # rule engine, on-demand vision for auto_ai matches, LLM verification,
-  # persistence, rule stats and Implio submission. Port of the
-  # moderateListing action in convex/moderation.ts.
+  # persistence and rule stats. Port of the moderateListing action in
+  # convex/moderation.ts (the Implio submit-back step was removed — this
+  # system replaces Implio).
   class Runner
     DEFAULT_LLM_MODEL = "claude-haiku-4-5-20251001".freeze
     MAX_VISION_IMAGES = 10
 
+    # Namespace for pg advisory locks taken per listing (classid argument of
+    # pg_try_advisory_lock(int4, int4)); chosen arbitrarily, must just be
+    # stable and unique to "moderation run" within this app.
+    ADVISORY_LOCK_CLASS = 7_413
+
     class << self
       def call(listing, moderator: nil, param_scan: true)
+        # A locked listing carries a final human decision — automated
+        # re-moderation must never change or shadow it.
+        if listing.moderation_locked?
+          return skipped_response(listing, "locked")
+        end
+
+        # One moderation run per listing at a time: webhook bursts, job
+        # retries and a moderator clicking "Moderate" can otherwise interleave
+        # and leave the listing status pointing at the loser's outcome.
+        with_listing_lock(listing.id) do |acquired|
+          return skipped_response(listing, "concurrent_run") unless acquired
+
+          run(listing, moderator: moderator, param_scan: param_scan)
+        end
+      end
+
+      private
+
+      def run(listing, moderator: nil, param_scan: true)
         settings = Setting.current
 
         # 0. AI Parameter Scan. Failure is non-blocking — the scan doesn't
@@ -70,30 +95,27 @@ module Moderation
         outcome = result[:outcome].to_s
         camel_matches = result[:matches].map { |m| camelize_match(m) }
 
-        # 5. Persist result + update listing status
-        moderation_result = ModerationResult.create!(
-          listing: listing,
-          je_id: listing.je_id,
-          outcome: outcome,
-          rule_matches: camel_matches,
-          llm_triggered: llm_triggered,
-          llm_response: llm_response,
-          seller_message: result[:seller_message],
-          confidence: result[:confidence],
-          vision_result: vision_result,
-          vision_model: vision_result&.dig("model"),
-          processed_at: (Time.current.to_f * 1000).to_i
-        )
-        listing.update!(moderation_status: outcome)
-
-        # 6. Rule stats for matched rules (llm_assessment is synthetic)
-        update_rule_stats(camel_matches)
-
-        # 7. Implio submission — stub-aware, never blocks the moderation run
-        begin
-          Integrations::ImplioClient.submit_result(moderation_result)
-        rescue StandardError => e
-          Rails.logger.error("Implio submission failed for listing #{listing.je_id}: #{e.message}")
+        # 5-6. Persist result + listing status + rule stats atomically: a
+        # failure mid-sequence must not leave an orphaned result row pointing
+        # at a listing whose status was never updated (job retries would then
+        # double-record the decision).
+        moderation_result = nil
+        ActiveRecord::Base.transaction do
+          moderation_result = ModerationResult.create!(
+            listing: listing,
+            je_id: listing.je_id,
+            outcome: outcome,
+            rule_matches: camel_matches,
+            llm_triggered: llm_triggered,
+            llm_response: llm_response,
+            seller_message: result[:seller_message],
+            confidence: result[:confidence],
+            vision_result: vision_result,
+            vision_model: vision_result&.dig("model"),
+            processed_at: (Time.current.to_f * 1000).to_i
+          )
+          listing.update!(moderation_status: outcome)
+          update_rule_stats(camel_matches)
         end
 
         {
@@ -153,8 +175,6 @@ module Moderation
           "batchId" => listing.batch_id
         }.compact
       end
-
-      private
 
       def engine_settings(settings)
         {
@@ -255,10 +275,38 @@ module Moderation
         names = camel_matches.map { |m| m["ruleName"] }.uniq - [ "llm_assessment" ]
         return if names.empty?
 
+        # Single atomic SQL increment — the previous read-modify-write loop
+        # lost counts whenever two runs matched the same rule concurrently.
         now_ms = (Time.current.to_f * 1000).to_i
-        Rule.where(name: names).find_each do |rule|
-          rule.update!(match_count: (rule.match_count || 0) + 1, last_matched_at: now_ms)
+        Rule.where(name: names)
+            .update_all([ "match_count = COALESCE(match_count, 0) + 1, last_matched_at = ?", now_ms ])
+      end
+
+      # Session-scoped pg advisory lock keyed on the listing id. Yields true
+      # when this process owns the run, false when another run is already in
+      # flight (the caller skips instead of racing). Unlike a row lock it is
+      # safe to hold across the slow AI calls — no transaction stays open.
+      def with_listing_lock(listing_id)
+        conn = ActiveRecord::Base.connection
+        acquired = conn.select_value(
+          "SELECT pg_try_advisory_lock(#{ADVISORY_LOCK_CLASS}, #{Integer(listing_id)})"
+        )
+        begin
+          yield acquired
+        ensure
+          conn.execute("SELECT pg_advisory_unlock(#{ADVISORY_LOCK_CLASS}, #{Integer(listing_id)})") if acquired
         end
+      end
+
+      def skipped_response(listing, reason)
+        {
+          outcome: listing.moderation_status,
+          skipped: reason,
+          ruleMatches: [],
+          llmTriggered: false,
+          confidence: nil,
+          visionAnalyzed: false
+        }
       end
     end
   end

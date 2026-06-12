@@ -17,9 +17,6 @@ require_relative "rule_evaluator"
 module Moderation
   class Engine
     DETERMINISTIC_CATEGORIES = %w[simple_code hybrid_vision internal].freeze
-    # HIDDEN: the "accuracy" category is disabled upstream (commented out of
-    # the deterministic filter in moderation.ts on 2026-03-17) — accuracy
-    # rules exist in the seed data but are never evaluated. Mirrored here.
     AI_TRIGGER_CATEGORIES = %w[auto_ai former_manual].freeze
 
     DEFAULT_REJECT_MESSAGE = "Your listing does not meet our quality standards.".freeze
@@ -70,11 +67,7 @@ module Moderation
       deterministic_rules.each do |rule|
         config = rule["config"]
         result =
-          if rule["category"] == "accuracy"
-            # Unreachable while accuracy is excluded from
-            # DETERMINISTIC_CATEGORIES; kept to mirror the TS dispatch.
-            RuleEvaluator.evaluate_accuracy(listing, config)
-          elsif rule["category"] == "hybrid_vision"
+          if rule["category"] == "hybrid_vision"
             # Skip hybrid rules when no vision data
             next unless has_vision_data
             RuleEvaluator.evaluate_hybrid_vision(listing, config)

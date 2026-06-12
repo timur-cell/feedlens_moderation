@@ -258,25 +258,4 @@ RSpec.describe Moderation::Runner do
       described_class.call(listing)
     end
   end
-
-  describe "Implio integration" do
-    around { |example| with_env("ANTHROPIC_API_KEY" => nil, "IMPLIO_STUB" => nil) { example.run } }
-
-    it "submits the persisted result to Implio (stub-aware)" do
-      listing = create(:listing, je_id: "16680099")
-      expect(Integrations::ImplioClient).to receive(:submit_result)
-        .with(an_instance_of(ModerationResult))
-        .and_return(success: true, stubbed: true)
-
-      described_class.call(listing)
-    end
-
-    it "does not fail the run when Implio submission raises" do
-      listing = create(:listing, je_id: "16680100")
-      allow(Integrations::ImplioClient).to receive(:submit_result).and_raise(StandardError, "implio down")
-
-      expect(described_class.call(listing)[:outcome]).to eq("approved")
-      expect(ModerationResult.last.outcome).to eq("approved")
-    end
-  end
 end

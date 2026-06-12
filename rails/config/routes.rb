@@ -31,6 +31,7 @@ Rails.application.routes.draw do
     get "listings", to: "listings#index"
     get "listings/:id", to: "listings#show"
     post "listings/:id/moderate", to: "listings#moderate"
+    post "listings/:id/unlock", to: "listings#unlock"
     post "listings/:id/param-scan", to: "param_scans#create"
     get "listings/:listing_id/notes", to: "notes#index"
     post "listings/:listing_id/notes", to: "notes#create"
@@ -46,7 +47,6 @@ Rails.application.routes.draw do
     get "moderation-results/latest-by-je-id/:je_id", to: "moderation_results#latest_by_je_id",
         constraints: { je_id: %r{[^/]+} }
     post "moderation-results/:id/override", to: "moderation_results#override"
-    post "moderation-results/:id/override-with-implio", to: "moderation_results#override_with_implio"
 
     get "dashboard/stats", to: "dashboard#stats"
     get "dashboard/export-csv", to: "dashboard#export_csv"
@@ -89,7 +89,6 @@ Rails.application.routes.draw do
     delete "image-recognition/analyses", to: "image_recognition#destroy_all_analyses"
     post "image-recognition/analyze", to: "image_recognition#analyze"
     post "image-recognition/analyze-listing-url", to: "image_recognition#analyze_listing_url"
-    post "image-recognition/submit-implio", to: "image_recognition#submit_implio"
 
     # --- AI parameter scans ------------------------------------------------
     get "param-scans/recent", to: "param_scans#recent"

@@ -4,7 +4,7 @@ require_relative "condition_evaluator"
 
 # Port of the per-rule evaluators from convex/moderation.ts:
 # evaluateSimpleRule, evaluateRegexRule, evaluateHybridVisionRule,
-# evaluateAccuracyRule, evaluateOfficeRule and resolveListRefs/escapeRegex.
+# evaluateOfficeRule and resolveListRefs/escapeRegex.
 #
 # Listings, configs and lists are plain Hashes with camelCase string keys —
 # the same shape as the Convex documents / db/seed_data JSON files.
@@ -17,6 +17,55 @@ require_relative "condition_evaluator"
 module Moderation
   module RuleEvaluator
     module_function
+
+    # Rule configs were authored against vision field names (gptCondition,
+    # gptConclusion, ...) that the listing hash actually exposes under its
+    # chatGpt* keys. Without this alias the conditions read nil and the rule
+    # silently never matches. Only fields with a real backing key are mapped;
+    # fields with no data source (gptWatermarkSold, viktor*, duplicates*) stay
+    # unmapped and their rules remain inert until those signals are produced.
+    FIELD_ALIASES = {
+      "gptCondition" => "chatGptPropertyCondition",
+      "gptConclusion" => "chatGptConclusion",
+      "gptImageType" => "chatGptImageType",
+      "gptWatermarkText" => "chatGptWatermarkText",
+      "gptWatermarkShare" => "chatGptWatermarkShare"
+    }.freeze
+
+    # Operators for which a `country` condition must be compared through
+    # CountryMatcher (so {field: country, eq, "RU"} matches a listing whose
+    # country is the full name "Russia"), not via raw JS string equality.
+    COUNTRY_EQ_OPERATORS = %w[eq == in].freeze
+    COUNTRY_NEQ_OPERATORS = %w[neq != not_in].freeze
+
+    # Case-insensitive word-boundary containment for exact list terms. Uses
+    # \b only when the term begins/ends with a word character (so terms like
+    # "with AI" still match and punctuation-only edges don't break).
+    def word_in_text?(text, term)
+      t = term.strip
+      return false if t.empty?
+      lead = t =~ /\A\w/ ? '\b' : ""
+      trail = t =~ /\w\z/ ? '\b' : ""
+      Regexp.new("#{lead}#{Regexp.escape(t)}#{trail}", Regexp::IGNORECASE).match?(text)
+    end
+
+    # Read a condition field from the listing, resolving authored aliases.
+    def field_value(listing, field)
+      return listing[field] if listing.key?(field)
+      aliased = FIELD_ALIASES[field]
+      aliased ? listing[aliased] : nil
+    end
+
+    # Evaluate one condition, with country-aware comparison for the country
+    # field and alias resolution for everything else.
+    def evaluate_condition(listing, field, operator, value)
+      if field == "country" && (COUNTRY_EQ_OPERATORS.include?(operator) || COUNTRY_NEQ_OPERATORS.include?(operator))
+        list = value.is_a?(Array) ? value : [ value ]
+        present = CountryMatcher.matches?(listing["country"], list)
+        return COUNTRY_EQ_OPERATORS.include?(operator) ? present : !present
+      end
+      ConditionEvaluator.evaluate(field_value(listing, field), operator, value)
+    end
 
     # JS template-literal interpolation (`${value}`).
     def interp(value)
@@ -203,7 +252,7 @@ module Moderation
       # branch and every([]) === true.
       if JsCompat.js_truthy?(config["conditions"])
         results = config["conditions"].map do |c|
-          ConditionEvaluator.evaluate(listing[c["field"]], c["operator"], c["value"])
+          evaluate_condition(listing, c["field"], c["operator"], c["value"])
         end
         met = config["requireAll"] == false ? results.any? : results.all?
         conditions_met = false unless met
@@ -215,7 +264,7 @@ module Moderation
       # OR conditions (at least one must match)
       if config["orConditions"].is_a?(Array)
         results = config["orConditions"].map do |c|
-          ConditionEvaluator.evaluate(listing[c["field"]], c["operator"], c["value"])
+          evaluate_condition(listing, c["field"], c["operator"], c["value"])
         end
         conditions_met = false unless results.any?
         inner = config["orConditions"].each_with_index.map do |c, i|
@@ -227,8 +276,8 @@ module Moderation
       # Single field/operator
       if JsCompat.js_falsy?(config["conditions"]) && JsCompat.js_falsy?(config["orConditions"]) &&
          JsCompat.js_truthy?(config["field"]) && JsCompat.js_truthy?(config["operator"])
-        val = listing[config["field"]]
-        conditions_met = ConditionEvaluator.evaluate(val, config["operator"], config["value"])
+        val = field_value(listing, config["field"])
+        conditions_met = evaluate_condition(listing, config["field"], config["operator"], config["value"])
         cond_details << "#{config["field"]}=#{interp(val)} #{config["operator"]} #{interp(config["value"])}"
       end
 
@@ -307,9 +356,11 @@ module Moderation
           fields.each do |field|
             value = listing[field]
             next unless value.is_a?(String)
-            lower_value = value.downcase
             words.each do |word|
-              if lower_value.include?(word.downcase)
+              # Word-boundary match so list term "Sold" does not fire on
+              # "unsold"/"resold" and "Venduto" not on "rivenduto". Falls back
+              # to substring for terms without alphanumeric edges.
+              if word_in_text?(value, word)
                 matched_patterns << "\"#{word}\" (#{list_name}) in #{field}"
               end
             end
@@ -482,67 +533,6 @@ module Moderation
 
       # Fallback: no recognized vision check type
       { matched: false, details: "no vision check type matched in config" }
-    end
-
-    # ─── evaluateAccuracyRule (LAS integration) ─────────────────────
-    # NOTE: the accuracy category is disabled in the deterministic phase
-    # (commented out in moderation.ts on 2026-03-17), so this evaluator is
-    # currently unreachable from Engine#evaluate. It is ported to keep parity
-    # with the TS file for an eventual rollback.
-    def evaluate_accuracy(listing, config)
-      flags = JsCompat.js_or(listing["accuracyFlags"], [])
-      score = listing["accuracyScore"]
-      acct_type = fallback(listing["officeSubscription"], listing["accountType"]).downcase
-
-      # Account type filter
-      if config["accountTypeFilter"].is_a?(Array)
-        if acct_type.empty? || config["accountTypeFilter"].none? { |f| acct_type.include?(f.downcase) }
-          return { matched: false, details: "accountType #{acct_type.empty? ? "unknown" : acct_type} not in #{interp(config["accountTypeFilter"])}" }
-        end
-      end
-
-      # No accuracy data at all -> skip
-      if flags.empty? && score.nil?
-        return { matched: false, details: "no LAS accuracy data" }
-      end
-
-      # Score-based check (e.g. las_score_critical)
-      unless config["maxAccuracyScore"].nil?
-        if !score.nil? && JsCompat.js_number(score) <= JsCompat.js_number(config["maxAccuracyScore"])
-          return { matched: true, details: "accuracy score #{format("%.2f", score)} ≤ #{interp(config["maxAccuracyScore"])}" }
-        end
-        if score.nil?
-          return { matched: false, details: "no accuracy score available" }
-        end
-        return { matched: false, details: "accuracy score #{format("%.2f", score)} > #{interp(config["maxAccuracyScore"])}" }
-      end
-
-      # Single flag check
-      if config["accuracyFlag"].is_a?(String) && JsCompat.js_truthy?(config["accuracyFlag"])
-        if flags.include?(config["accuracyFlag"])
-          return { matched: true, details: "LAS flag: #{config["accuracyFlag"]} (score: #{score.nil? ? "n/a" : format("%.2f", score)})" }
-        end
-        return { matched: false, details: "flag #{config["accuracyFlag"]} not in [#{flags.join(", ")}]" }
-      end
-
-      # Multi-flag check (matchAny = true -> any flag matches; false -> all must match)
-      if config["accuracyFlags"].is_a?(Array)
-        match_any = config["matchAny"] != false # default true
-        matched =
-          if match_any
-            config["accuracyFlags"].any? { |f| flags.include?(f) }
-          else
-            config["accuracyFlags"].all? { |f| flags.include?(f) }
-          end
-
-        if matched
-          found = config["accuracyFlags"].select { |f| flags.include?(f) }
-          return { matched: true, details: "LAS flags: #{found.join(", ")} (score: #{score.nil? ? "n/a" : format("%.2f", score)})" }
-        end
-        return { matched: false, details: "flags #{config["accuracyFlags"].join(", ")} not found in [#{flags.join(", ")}]" }
-      end
-
-      { matched: false, details: "no accuracy check matched in config" }
     end
 
     # ─── evaluateOfficeRule ─────────────────────────────────────────

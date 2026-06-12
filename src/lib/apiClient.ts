@@ -177,6 +177,8 @@ export const apiClient = {
     recent: (args?: { limit?: number }) =>
       request<any[]>("GET", "/api/listings/recent", { params: args }),
     stats: () => request<any>("GET", "/api/listings/stats"),
+    unlock: ({ listingId }: { listingId: string }) =>
+      request<any>("POST", `/api/listings/${listingId}/unlock`),
   },
 
   moderation: {
@@ -211,25 +213,11 @@ export const apiClient = {
       reason?: string;
       sellerMessage?: string;
       refuseReasonType?: string;
+      permanent?: boolean;
     }) =>
       request<any>("POST", `/api/moderation-results/${resultId}/override`, {
         body,
       }),
-    overrideWithImplio: ({
-      resultId,
-      ...body
-    }: {
-      resultId: string;
-      newOutcome: string;
-      reason?: string;
-      sellerMessage?: string;
-      refuseReasonType?: string;
-    }) =>
-      request<any>(
-        "POST",
-        `/api/moderation-results/${resultId}/override-with-implio`,
-        { body },
-      ),
   },
 
   dashboard: {
@@ -318,10 +306,6 @@ export const apiClient = {
       request<any>("POST", "/api/image-recognition/analyze", { body: args }),
     analyzeListingUrl: (args: { url: string }) =>
       request<any>("POST", "/api/image-recognition/analyze-listing-url", {
-        body: args,
-      }),
-    submitImplio: (args: { jeId: string; outcome: string; message?: string }) =>
-      request<any>("POST", "/api/image-recognition/submit-implio", {
         body: args,
       }),
   },

@@ -4,8 +4,14 @@ module Api
   class ModerateByIdController < BaseController
     def create
       inputs = Array(params[:inputs]).map(&:to_s)
-      result = Listings::FetchAndModerate.call(inputs: inputs, moderator: current_moderator)
-      render json: result
+
+      if ActiveModel::Type::Boolean.new.cast(params[:async])
+        result = Listings::FetchAndModerate.enqueue(inputs: inputs, moderator: current_moderator)
+        render json: result, status: :accepted
+      else
+        result = Listings::FetchAndModerate.call(inputs: inputs, moderator: current_moderator)
+        render json: result
+      end
     end
   end
 end

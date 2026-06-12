@@ -41,7 +41,7 @@ nano .env.production
 
 Fill in at minimum: `DOMAIN`, `SECRET_KEY_BASE` (`openssl rand -hex 64`),
 `DATABASE_PASSWORD`, `ADMIN_PASSWORD`, `ANTHROPIC_API_KEY`.
-Leave `IMPLIO_STUB=true` for the trial period. The LAS webhook stays disabled
+The LAS webhook stays disabled
 until you set `LAS_PUSH_API_KEY` (planned for later).
 
 ## 5. Boot
@@ -74,8 +74,6 @@ self-service reset).
 
 - Run one **Moderate by URL** with a real JE listing URL (verifies live JE API access).
 - Run one **image analysis** on the Image Recognition page (verifies the Anthropic key).
-- When ready for real Implio submissions: set `IMPLIO_STUB=false` + `IMPLIO_API_KEY` in
-  `.env.production` and `docker compose ... up -d` again.
 
 ## Enabling the LAS feed later
 

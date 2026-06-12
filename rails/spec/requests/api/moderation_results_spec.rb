@@ -9,8 +9,6 @@ RSpec.describe "Api moderation results", type: :request do
   include_examples "requires moderator", :post,
                    -> { "/api/moderation-results/#{create(:moderation_result).id}/override" },
                    { newOutcome: "approved" }
-  include_examples "requires moderator", :post,
-                   -> { "/api/moderation-results/#{create(:moderation_result).id}/override-with-implio" },
                    { newOutcome: "approved" }
 
   describe "GET /api/moderation-results/recent" do
@@ -143,38 +141,6 @@ RSpec.describe "Api moderation results", type: :request do
       sign_in_as(create(:moderator))
       post "/api/moderation-results/999999/override", params: { newOutcome: "approved" }, as: :json
       expect(response).to have_http_status(:not_found)
-    end
-  end
-
-  describe "POST /api/moderation-results/:id/override-with-implio" do
-    it "overrides and submits to Implio" do
-      result = create(:moderation_result, outcome: "manual")
-      sign_in_as(create(:moderator))
-
-      expect(Integrations::ImplioClient).to receive(:submit_result)
-        .with(have_attributes(id: result.id))
-        .and_return({ success: true })
-
-      post "/api/moderation-results/#{result.id}/override-with-implio",
-           params: { newOutcome: "approved" }, as: :json
-
-      expect(json).to eq("success" => true, "implioSubmitted" => true)
-      expect(result.reload.outcome).to eq("approved")
-      expect(result.listing.reload.moderation_status).to eq("approved")
-    end
-
-    it "reports Implio errors without failing the override" do
-      result = create(:moderation_result, outcome: "manual")
-      sign_in_as(create(:moderator))
-
-      allow(Integrations::ImplioClient).to receive(:submit_result)
-        .and_return({ success: false, error: "503: unavailable" })
-
-      post "/api/moderation-results/#{result.id}/override-with-implio",
-           params: { newOutcome: "rejected" }, as: :json
-
-      expect(json).to eq("success" => true, "implioSubmitted" => false, "implioError" => "503: unavailable")
-      expect(result.reload.outcome).to eq("rejected")
     end
   end
 end

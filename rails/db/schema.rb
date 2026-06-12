@@ -126,6 +126,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_000001) do
     t.string "listing_url"
     t.float "living_area"
     t.float "lqi"
+    t.boolean "moderation_locked", default: false, null: false
+    t.bigint "moderation_locked_at"
+    t.string "moderation_locked_by"
     t.string "moderation_status", null: false
     t.string "office"
     t.string "office_group_name"
@@ -148,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_000001) do
     t.index ["feed_source"], name: "index_listings_on_feed_source"
     t.index ["imported_at"], name: "index_listings_on_imported_at"
     t.index ["je_id"], name: "index_listings_on_je_id", unique: true
+    t.index ["moderation_locked"], name: "index_listings_on_moderation_locked"
     t.index ["moderation_status"], name: "index_listings_on_moderation_status"
   end
 

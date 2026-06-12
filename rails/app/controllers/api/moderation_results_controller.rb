@@ -56,19 +56,6 @@ module Api
       render json: { success: true }
     end
 
-    # POST /api/moderation-results/:id/override-with-implio
-    def override_with_implio
-      result = ModerationResult.find(params[:id])
-      apply_override!(result)
-
-      implio = Integrations::ImplioClient.submit_result(result)
-      implio = (implio || {}).symbolize_keys
-
-      payload = { success: true, implioSubmitted: implio[:success] == true }
-      payload[:implioError] = implio[:error] if implio[:error].present?
-      render json: payload
-    end
-
     private
 
     # Mirrors moderation.overrideDecision: stores the original outcome,
@@ -86,15 +73,32 @@ module Api
         seller_message: params[:sellerMessage].presence || result.seller_message
       }
       patch[:refuse_reason_type] = params[:refuseReasonType] if params[:refuseReasonType].present?
-      result.update!(patch)
 
-      result.listing.update!(moderation_status: new_outcome)
+      listing_patch = { moderation_status: new_outcome }
+      # permanent: true makes the human decision final — the listing is locked
+      # against any automated re-moderation until explicitly unlocked.
+      if ActiveModel::Type::Boolean.new.cast(params[:permanent])
+        listing_patch.merge!(
+          moderation_locked: true,
+          moderation_locked_at: now_ms,
+          moderation_locked_by: current_moderator.name.presence || current_moderator.email
+        )
+      end
+
+      # The override and the listing status must change together — a failure
+      # between the two writes would leave an overridden result whose listing
+      # still shows the machine outcome.
+      ActiveRecord::Base.transaction do
+        result.update!(patch)
+        result.listing.update!(listing_patch)
+      end
 
       log_activity(
         action: "override_decision",
         target_type: "moderationResult",
         target_id: result.id.to_s,
         details: "Overrode #{result.original_outcome} → #{new_outcome} for listing #{result.je_id}" \
+                 "#{listing_patch[:moderation_locked] ? ' (locked permanently)' : ''}" \
                  "#{params[:reason].present? ? ". Reason: #{params[:reason]}" : ''}"
       )
     end

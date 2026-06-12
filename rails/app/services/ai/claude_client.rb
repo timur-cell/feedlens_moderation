@@ -11,6 +11,11 @@ module Ai
     OPEN_TIMEOUT = 15
     READ_TIMEOUT = 120
 
+    # Transient failures (rate limits, server errors, overload) are retried
+    # with a short backoff before giving up; anything else raises immediately.
+    RETRYABLE_STATUSES = [ 429, 500, 502, 503, 529 ].freeze
+    RETRY_DELAYS = [ 1, 3 ].freeze
+
     class MissingApiKeyError < StandardError; end
 
     class ApiError < StandardError
@@ -32,24 +37,31 @@ module Ai
 
         body = { model: model, max_tokens: max_tokens, messages: messages }
         body[:temperature] = temperature unless temperature.nil?
+        payload = JSON.generate(body)
 
-        uri = URI(API_URL)
-        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                                   open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-          request = Net::HTTP::Post.new(uri)
-          request["content-type"] = "application/json"
-          request["x-api-key"] = api_key
-          request["anthropic-version"] = ANTHROPIC_VERSION
-          request.body = JSON.generate(body)
-          http.request(request)
+        attempts = 0
+        begin
+          response = post_request(api_key, payload)
+
+          unless response.is_a?(Net::HTTPSuccess)
+            raise ApiError.new("Claude API error #{response.code}: #{response.body}",
+                               status: response.code.to_i, body: response.body)
+          end
+
+          JSON.parse(response.body)
+        rescue ApiError => e
+          raise unless RETRYABLE_STATUSES.include?(e.status) && attempts < RETRY_DELAYS.length
+
+          pause(RETRY_DELAYS[attempts])
+          attempts += 1
+          retry
+        rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, SocketError => e
+          raise ApiError.new("Claude API connection error: #{e.message}") unless attempts < RETRY_DELAYS.length
+
+          pause(RETRY_DELAYS[attempts])
+          attempts += 1
+          retry
         end
-
-        unless response.is_a?(Net::HTTPSuccess)
-          raise ApiError.new("Claude API error #{response.code}: #{response.body}",
-                             status: response.code.to_i, body: response.body)
-        end
-
-        JSON.parse(response.body)
       end
 
       # First text block of a Messages API response (the TS code does
@@ -69,6 +81,32 @@ module Ai
 
       def tokens_used(response)
         input_tokens(response) + output_tokens(response)
+      end
+
+      # True when the model hit the max_tokens cap — the decision fields may
+      # be missing from the JSON, so callers should treat the response as
+      # degraded rather than silently falling back.
+      def truncated?(response)
+        response["stop_reason"] == "max_tokens"
+      end
+
+      private
+
+      def post_request(api_key, payload)
+        uri = URI(API_URL)
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+                        open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+          request = Net::HTTP::Post.new(uri)
+          request["content-type"] = "application/json"
+          request["x-api-key"] = api_key
+          request["anthropic-version"] = ANTHROPIC_VERSION
+          request.body = payload
+          http.request(request)
+        end
+      end
+
+      def pause(seconds)
+        sleep(seconds)
       end
     end
   end

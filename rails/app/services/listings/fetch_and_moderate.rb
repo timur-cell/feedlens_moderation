@@ -7,6 +7,11 @@ module Listings
     MAX_VISION_IMAGES = 10
     DEFAULT_VISION_COUNTRIES = %w[ES IT PT FR GR].freeze
 
+    # Synchronous batches above this size are pushed to the queue instead of
+    # being processed inline, so a large paste / feed burst can never hold a
+    # web thread for the full fetch + vision + LLM chain per input.
+    MAX_SYNC_INPUTS = 25
+
     DATA_FETCH_FAILED_MATCH = {
       "ruleName" => "data_fetch_failed",
       "ruleCategory" => "internal",
@@ -19,17 +24,16 @@ module Listings
 
     class << self
       def call(inputs:, moderator: nil)
-        results = []
+        cleaned = Array(inputs).map { |i| i.to_s.strip }.reject(&:empty?)
 
-        Array(inputs).each do |input|
-          trimmed = input.to_s.strip
-          next if trimmed.empty?
+        # Safety valve: oversized batches must not run inline on the request
+        # thread — fall back to the async queue path automatically.
+        return enqueue(inputs: cleaned, moderator: moderator) if cleaned.length > MAX_SYNC_INPUTS
 
-          begin
-            results << process_input(trimmed, moderator: moderator)
-          rescue StandardError => e
-            results << { jeId: trimmed, input: trimmed, error: e.message, status: "error" }
-          end
+        results = cleaned.map do |input|
+          process_one(input, moderator: moderator)
+        rescue StandardError => e
+          { jeId: input, input: input, error: e.message, status: "error" }
         end
 
         {
@@ -39,6 +43,16 @@ module Listings
           errorCount: results.count { |r| r[:status] == "error" },
           results: results
         }
+      end
+
+      # Enqueue one job per input and return immediately. Oversized interactive
+      # batches (and any caller that wants async) use this so the heavy AI work
+      # runs in Solid Queue rather than on a Puma thread.
+      def enqueue(inputs:, moderator: nil)
+        cleaned = Array(inputs).map { |i| i.to_s.strip }.reject(&:empty?)
+        cleaned.each { |input| FetchAndModerateJob.perform_later(input, moderator&.id) }
+
+        { success: true, status: "queued", queued: cleaned.length, count: cleaned.length }
       end
 
       # Port of the enrichListing internal action: fetch full data from JE
@@ -59,6 +73,9 @@ module Listings
           title: data[:title],
           price: data[:price],
           currency: data[:currency],
+          # JE already converts prices to USD upstream; map that payload field
+          # here once identified — 23 priceUsd rules depend on it (do NOT build
+          # a separate FX service for this).
           price_usd: nil,
           price_on_request: data[:price_on_request],
           category: data[:category] || "real_estate",
@@ -125,18 +142,37 @@ module Listings
         end
       end
 
+      # Public so BqListingMapper can reuse it for BQ-ingested listings.
       def compute_price_per_sqm(price, living_area)
         return nil unless price.is_a?(Numeric) && price.positive? && living_area.is_a?(Numeric) && living_area.positive?
 
         (price.to_f / living_area).round
       end
 
-      private
-
-      def process_input(trimmed, moderator:)
+      # Fetch + moderate a single input (id or jamesedition.com URL). Public so
+      # FetchAndModerateJob can call it; returns the same per-input result hash
+      # the synchronous batch path collects.
+      def process_one(trimmed, moderator: nil)
         je_id, url = parse_input(trimmed)
         if je_id.empty? || je_id.length < 5
           return { jeId: trimmed, input: trimmed, error: "Invalid listing ID", status: "error" }
+        end
+
+        # A locked listing carries a final human decision: skip the re-import
+        # (which would reset moderation_status to pending) and the re-moderation
+        # entirely.
+        locked = Listing.find_by(je_id: je_id, moderation_locked: true)
+        if locked
+          return {
+            jeId: je_id,
+            input: trimmed,
+            listingId: locked.id,
+            title: locked.title,
+            outcome: locked.moderation_status,
+            locked: true,
+            status: "skipped",
+            error: "Listing decision is locked by #{locked.moderation_locked_by.presence || 'a moderator'} — unlock it to re-moderate"
+          }
         end
 
         # Fetch listing data with cascading sources
@@ -219,6 +255,8 @@ module Listings
           }
         }
       end
+
+      private
 
       def minimal_listing_data(je_id, url)
         {
