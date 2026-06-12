@@ -83,6 +83,14 @@ RSpec.describe Moderation::Runner do
       expect(clean.reload.moderation_status).to eq("approved")
       expect(rule.reload.match_count).to eq(2) # unchanged
     end
+
+    it "skips the AI param scan when param_scan: false (batch callers)" do
+      result = described_class.call(listing, param_scan: false)
+
+      expect(result[:outcome]).to eq("rejected") # outcome unaffected
+      expect(result[:aiScanVerdict]).to be_nil
+      expect(AiParameterScan.where(listing_id: listing.id).count).to eq(0)
+    end
   end
 
   describe "needs_llm path" do

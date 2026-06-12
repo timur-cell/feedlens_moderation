@@ -142,6 +142,13 @@ module Listings
         end
       end
 
+      # Public so BqListingMapper can reuse it for BQ-ingested listings.
+      def compute_price_per_sqm(price, living_area)
+        return nil unless price.is_a?(Numeric) && price.positive? && living_area.is_a?(Numeric) && living_area.positive?
+
+        (price.to_f / living_area).round
+      end
+
       # Fetch + moderate a single input (id or jamesedition.com URL). Public so
       # FetchAndModerateJob can call it; returns the same per-input result hash
       # the synchronous batch path collects.
@@ -281,12 +288,6 @@ module Listings
         listing.imported_at = now_ms
         listing.save!
         listing
-      end
-
-      def compute_price_per_sqm(price, living_area)
-        return nil unless price.is_a?(Numeric) && price.positive? && living_area.is_a?(Numeric) && living_area.positive?
-
-        (price.to_f / living_area).round
       end
 
       def should_run_vision?(country)

@@ -44,6 +44,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       APP_HOST: ${APP_HOST:-localhost}
       APP_PORT: ${APP_PORT:-8080}
+      # BigQuery listing sync key (jobs mounts ./secrets; missing file = sync no-ops)
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/secrets/bigquery-credentials.json}
       RAILS_LOG_TO_STDOUT: "1"
     depends_on:
       db:
@@ -63,6 +65,8 @@ services:
         BASE_REGISTRY: ${BASE_REGISTRY:-mirror.gcr.io}
     command: ["./bin/jobs"]
     environment: *rails_env
+    volumes:
+      - ./secrets:/secrets:ro
     depends_on:
       web:
         condition: service_healthy

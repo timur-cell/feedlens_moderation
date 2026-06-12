@@ -18,6 +18,10 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # Use the database-backed adapter for Active Job (no Redis)
 gem "solid_queue"
 
+# BigQuery listing ingestion (Listings::BqSync); required lazily by
+# Integrations::BigqueryClient so web boot stays lean.
+gem "google-cloud-bigquery", "~> 1.50", require: false
+
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 

@@ -13,3 +13,11 @@ production:
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+  # Daily BigQuery listing ingestion (no-op unless the service-account key
+  # is mounted — see HANDOFF.md). 06:00 UTC, after the nightly Airflow load
+  # into data_marts (~05:35); exact timing is non-critical because the
+  # watermark only advances to the max listing_created_at actually seen.
+  bq_listing_sync:
+    class: BqListingSyncJob
+    queue: default
+    schedule: every day at 6am

@@ -21,7 +21,22 @@ The Rails 8 app in `rails/` replaces the Convex backend (`convex/`, frozen on br
 | `JE_API_BASE` | — | JE mobile API base (default `https://www.jamesedition.com`; e2e overlay points it at a mock) |
 | `SMTP_ADDRESS/PORT/USERNAME/PASSWORD/AUTH/STARTTLS` | for mail | Devise password-reset mail; without `SMTP_ADDRESS` deliveries are disabled |
 | `APP_HOST` / `APP_PORT` | — | Mailer link host/port (default localhost:8080) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | for BQ sync | Service-account JSON path in-container (compose default `/secrets/bigquery-credentials.json` from `./secrets/`; the sync no-ops with a log line when the file is absent) |
 | `VITE_API_BASE` | frontend | API origin for the SPA build (default `""` = same origin behind nginx) |
+
+## BigQuery listing sync
+
+`BqListingSyncJob` (recurring.yml, daily 06:00 UTC) pulls newly created active
+RealEstate/Car listings (initial scope: ES/PT — `Listings::BqSync::COUNTRIES`)
+from `data_marts` in BigQuery via `Listings::BqSync`,
+watermarked on `listing_created_at` (`sync_states` row `bq_listings`,
+bootstrapped to first-run time — no backfill). Each new listing runs through
+`Moderation::Runner` with `param_scan: false` (no per-listing Claude call;
+vision/LLM still fire on rule triggers). Existing `je_id`s are skipped;
+flag-only (the Implio stub is untouched). Synced batches carry
+`batch_id` `bq-sync-<date>`. Manual run: `bin/rails bq:sync`.
+Note: `je_production_postgresql_readonly.*` in BigQuery is frozen (June 2020) —
+always use `data_marts.pg_*`.
 
 ## Importing production data later
 

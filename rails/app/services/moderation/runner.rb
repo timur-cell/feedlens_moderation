@@ -14,7 +14,7 @@ module Moderation
     ADVISORY_LOCK_CLASS = 7_413
 
     class << self
-      def call(listing, moderator: nil)
+      def call(listing, moderator: nil, param_scan: true)
         # A locked listing carries a final human decision — automated
         # re-moderation must never change or shadow it.
         if listing.moderation_locked?
@@ -27,23 +27,26 @@ module Moderation
         with_listing_lock(listing.id) do |acquired|
           return skipped_response(listing, "concurrent_run") unless acquired
 
-          run(listing, moderator: moderator)
+          run(listing, moderator: moderator, param_scan: param_scan)
         end
       end
 
       private
 
-      def run(listing, moderator: nil)
+      def run(listing, moderator: nil, param_scan: true)
         settings = Setting.current
 
         # 0. AI Parameter Scan. Failure is non-blocking — the scan doesn't
-        #    affect the moderation outcome.
+        #    affect the moderation outcome. Batch callers (BQ sync) skip it
+        #    to avoid one Claude call per listing.
         ai_scan =
-          begin
-            Ai::ParamScan.call(listing)
-          rescue StandardError => e
-            Rails.logger.error("AI Param Scan failed (non-blocking): #{e.message}")
-            nil
+          if param_scan
+            begin
+              Ai::ParamScan.call(listing)
+            rescue StandardError => e
+              Rails.logger.error("AI Param Scan failed (non-blocking): #{e.message}")
+              nil
+            end
           end
 
         # 1. Rules + lists + engine
