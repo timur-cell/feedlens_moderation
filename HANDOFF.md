@@ -38,6 +38,23 @@ flag-only (the Implio stub is untouched). Synced batches carry
 Note: `je_production_postgresql_readonly.*` in BigQuery is frozen (June 2020) —
 always use `data_marts.pg_*`.
 
+**Test harness (`bin/rails bq:test`).** On-demand sync over arbitrary
+countries/volume/window, isolated from the cron — it does **not** read or
+advance the production watermark and tags rows `batch_id bq-test-<date>`.
+Use it to exercise the pipeline at larger scale or in other markets before
+widening the cron's `MAX_LISTINGS_PER_RUN` (300) or `COUNTRIES` (ES/PT).
+
+```bash
+COUNTRIES=ES,PT,FR,IT LIMIT=1000 DAYS=14 bin/rails bq:test   # defaults: ES,PT / 100 / 7
+bin/rails bq:test_purge                                       # delete all bq-test-* rows
+```
+
+It runs the **full** engine (`param_scan: false`, same as cron) including
+vision + LLM verification on triggered listings, so Anthropic spend scales
+with `LIMIT`. Returns a verbose summary (outcome distribution, top fired
+rules, llm-triggered count). `Listings::BqSync.test_run(countries:, limit:,
+since:)` is the underlying method.
+
 ## Importing production data later
 
 `npx convex export` produces a ZIP of JSONL documents. Import it with:
