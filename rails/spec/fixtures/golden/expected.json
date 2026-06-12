@@ -285,14 +285,12 @@
   {
     "label": "commercial_title_needs_llm",
     "matches": [
-      "commercial_properties_title",
-      "commercial_properties_23"
+      "commercial_properties_title"
     ],
     "outcome": "needs_llm",
     "needsLlm": true,
     "llmRuleMatches": [
-      "commercial_properties_title",
-      "commercial_properties_23"
+      "commercial_properties_title"
     ],
     "sellerMessage": null
   },

@@ -32,7 +32,7 @@ RSpec.describe Listings::BqListingMapper do
       lqi_score: 0.42,
       image_count: 2,
       avg_image_width: 1200.0,
-      avg_image_height: 800.0,
+      avg_image_height: 806.7272727272729,
       image_urls: [ "https://img.example/1.jpg", "https://img.example/2.jpg" ]
     }.merge(overrides)
   end
@@ -52,6 +52,8 @@ RSpec.describe Listings::BqListingMapper do
     expect(attrs[:country]).to eq("ES")
     expect(attrs[:state]).to eq("Andalusia")
     expect(attrs[:lqi]).to eq(42.0)
+    expect(attrs[:avg_image_width]).to eq(1200)
+    expect(attrs[:avg_image_height]).to eq(807)
     expect(attrs[:office_group_name]).to eq("3167")
     expect(attrs[:office_subscription]).to eq("freemium")
     expect(attrs[:feed_source]).to eq("feed")

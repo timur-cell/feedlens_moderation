@@ -90,9 +90,10 @@ interface QueueListing {
   preOwned?: boolean;
   outdated?: boolean;
   year?: number;
-  chatGptConditionScore?: number;
+  chatGptConclusion?: string;
+  chatGptPropertyCondition?: number;
   chatGptWatermarkShare?: number;
-  chatGptQualityScore?: number;
+  chatGptImageQuality?: string;
   // LAS accuracy data
   accuracyScore?: number;
   accuracyLabel?: string;
@@ -661,7 +662,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">Content Quality</div>
                   <div className="flex flex-wrap gap-1.5">
                     <Param icon={Image} label="Images" value={listing.imageCount ?? null} warn={listing.imageCount != null && listing.imageCount < 3} />
-                    <Param label="Avg Img" value={listing.avgImageWidth != null && listing.avgImageHeight != null ? `${listing.avgImageWidth}×${listing.avgImageHeight}px` : null} />
+                    <Param label="Avg Img" value={listing.avgImageWidth != null && listing.avgImageHeight != null ? `${Math.round(listing.avgImageWidth)}×${Math.round(listing.avgImageHeight)}px` : null} />
                     <Param label="LQI" value={listing.lqi != null ? `${listing.lqi}%` : null} warn={listing.lqi != null && listing.lqi < 40} />
                     <Param icon={FileText} label="Desc" value={listing.descriptionLength != null ? `${listing.descriptionLength} chars` : null} />
                   </div>
@@ -671,9 +672,9 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                 <div>
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-medium mb-1">AI Analysis</div>
                   <div className="flex flex-wrap gap-1.5">
-                    <Param icon={Bot} label="AI Conclusion" value={listing.chatGptConditionScore != null ? listing.chatGptConditionScore.toFixed(1) : null} warn={listing.chatGptConditionScore != null && listing.chatGptConditionScore < 3} />
+                    <Param icon={Bot} label="AI Condition" value={listing.chatGptPropertyCondition != null ? `${listing.chatGptPropertyCondition}/6` : null} warn={listing.chatGptPropertyCondition != null && listing.chatGptPropertyCondition < 3} />
                     <Param icon={Bot} label="AI Watermark" value={listing.chatGptWatermarkShare != null ? `${listing.chatGptWatermarkShare}/10` : null} warn={listing.chatGptWatermarkShare != null && listing.chatGptWatermarkShare > 2} />
-                    <Param icon={Bot} label="AI Img Quality" value={listing.chatGptQualityScore != null ? listing.chatGptQualityScore.toFixed(1) : null} warn={listing.chatGptQualityScore != null && listing.chatGptQualityScore < 3} />
+                    <Param icon={Bot} label="AI Img Quality" value={listing.chatGptImageQuality ?? null} warn={listing.chatGptImageQuality === "poor" || listing.chatGptImageQuality === "low"} />
                   </div>
                 </div>
               </div>
@@ -704,7 +705,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                     <div><span className="text-muted-foreground">JE ID:</span> <a href={`https://www.jamesedition.com/admin/listings/${listing.jeId}/edit`} target="_blank" rel="noopener noreferrer" className="font-mono text-primary hover:underline">{listing.jeId}</a></div>
                     <div><span className="text-muted-foreground">Office ID:</span> {listing.office ? <a href={`https://www.jamesedition.com/admin/listings?search_term=${encodeURIComponent(listing.office)}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{listing.office}</a> : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                    <div><span className="text-muted-foreground">Avg img:</span> {listing.avgImageWidth != null && listing.avgImageHeight != null ? `${listing.avgImageWidth}×${listing.avgImageHeight}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
+                    <div><span className="text-muted-foreground">Avg img:</span> {listing.avgImageWidth != null && listing.avgImageHeight != null ? `${Math.round(listing.avgImageWidth)}×${Math.round(listing.avgImageHeight)}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Pre-owned:</span> {listing.preOwned != null ? (listing.preOwned ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Outdated:</span> {listing.outdated != null ? (listing.outdated ? "Yes" : "No") : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                     <div><span className="text-muted-foreground">Year:</span> {listing.year != null ? listing.year : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
@@ -956,7 +957,7 @@ function ListingCard({ listing }: { listing: QueueListing }) {
 }
 
 export default function QueuePage() {
-  const { data: listings } = useApiQuery(apiClient.listings.pending, undefined, {
+  const { data: listings, error, refetch } = useApiQuery(apiClient.listings.pending, undefined, {
     pollMs: 10000,
   });
 
@@ -969,7 +970,14 @@ export default function QueuePage() {
         </p>
       </div>
 
-      {!listings ? (
+      {error && !listings ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
+            <p className="text-sm text-muted-foreground">Failed to load the queue: {error.message}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : !listings ? (
         <div className="flex justify-center py-12">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>

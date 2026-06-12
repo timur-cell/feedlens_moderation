@@ -3,9 +3,14 @@ module Api
   # overrideWithImplio.
   class ModerationResultsController < BaseController
     # GET /api/moderation-results/recent?limit=
+    #
+    # Embeds the listing (same pattern as by_rule) so the log UI doesn't
+    # have to join against a separately-fetched recency window of listings.
     def recent
-      results = ModerationResult.order(processed_at: :desc, id: :desc).limit(limit_param(50))
-      render json: ConvexDoc.render_many(results)
+      results = ModerationResult.order(processed_at: :desc, id: :desc)
+                                .limit(limit_param(50))
+                                .includes(:listing)
+      render json: results.map { |r| ConvexDoc.render(r).merge("listing" => ConvexDoc.render(r.listing)) }
     end
 
     # GET /api/moderation-results/by-outcome?outcome=&limit=
@@ -13,7 +18,8 @@ module Api
       results = ModerationResult.where(outcome: params[:outcome].to_s)
                                 .order(processed_at: :desc, id: :desc)
                                 .limit(limit_param(50))
-      render json: ConvexDoc.render_many(results)
+                                .includes(:listing)
+      render json: results.map { |r| ConvexDoc.render(r).merge("listing" => ConvexDoc.render(r.listing)) }
     end
 
     # GET /api/moderation-results/for-listing/:listing_id

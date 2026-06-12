@@ -107,15 +107,31 @@ module Listings
           end
         end
 
+        # A fully-failed batch must NOT advance the watermark: the design is
+        # no-backfill, so advancing would permanently skip every row.
+        if rows.any? && errors == rows.length
+          Rails.logger.error("BQ sync: all #{errors} fetched rows failed — watermark NOT advanced")
+          return { error: true, errors: errors, fetched: rows.length }
+        end
+
         # Advance only to the max listing_created_at actually seen — never to
         # wall-clock now — so data_marts ETL lag and cap truncation can't
-        # skip rows.
+        # skip rows. Monotonic guard: a concurrent overlapping run can't move
+        # the watermark backwards.
         max_created = rows.filter_map { |r| r[:listing_created_at] }.max
-        state.update!(watermark_at: max_created) if max_created
+        if max_created
+          SyncState.where(key: WATERMARK_KEY)
+                   .where("watermark_at < ?", max_created)
+                   .update_all(watermark_at: max_created, updated_at: Time.current)
+        end
 
         summary = { created: created, skipped: skipped, errors: errors,
                     fetched: rows.length, watermark: state.reload.watermark_at }
-        Rails.logger.info("BQ sync done: #{summary.inspect}")
+        if errors.positive?
+          Rails.logger.warn("BQ sync done with errors: #{summary.inspect}")
+        else
+          Rails.logger.info("BQ sync done: #{summary.inspect}")
+        end
         summary
       end
 

@@ -23,6 +23,15 @@ RSpec.describe "Api moderation results", type: :request do
       expect(json.first["listingId"]).to eq(new.listing_id.to_s)
       expect(old.id).to be_present
     end
+
+    it "embeds the listing so the log UI can render title and thumbnail" do
+      result = create(:moderation_result)
+      sign_in_as(create(:moderator, role: "viewer"))
+
+      get "/api/moderation-results/recent"
+      expect(json.first["listing"]["_id"]).to eq(result.listing_id.to_s)
+      expect(json.first["listing"]["title"]).to eq(result.listing.title)
+    end
   end
 
   describe "GET /api/moderation-results/by-outcome" do

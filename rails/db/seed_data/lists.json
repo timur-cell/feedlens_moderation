@@ -85,10 +85,6 @@
     "type": "exact"
    },
    {
-    "value": "with AI",
-    "type": "exact"
-   },
-   {
     "value": "/\\bwith\\s*AI\\b/i",
     "type": "regex",
     "pattern": "\\bwith\\s*AI\\b",
@@ -184,10 +180,6 @@
   "items": [
    {
     "value": "SOLD!",
-    "type": "exact"
-   },
-   {
-    "value": "Sold",
     "type": "exact"
    },
    {
@@ -1214,14 +1206,6 @@
    },
    {
     "value": "Magazzino",
-    "type": "exact"
-   },
-   {
-    "value": "Mall",
-    "type": "exact"
-   },
-   {
-    "value": "Malls",
     "type": "exact"
    },
    {

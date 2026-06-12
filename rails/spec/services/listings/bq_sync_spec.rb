@@ -64,6 +64,7 @@ RSpec.describe Listings::BqSync do
     end
 
     it "creates and moderates new listings, skipping the param scan" do
+      SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 1))
       stub_bq([ bq_row(101), bq_row(102, listing_created_at: Time.utc(2026, 6, 12, 9)) ])
 
       result = described_class.call
@@ -109,6 +110,7 @@ RSpec.describe Listings::BqSync do
     end
 
     it "continues past a failing listing and still advances the watermark" do
+      SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 1))
       stub_bq([ bq_row(101), bq_row(102) ])
       call_count = 0
       allow(Moderation::Runner).to receive(:call) do |listing, **|
@@ -121,6 +123,26 @@ RSpec.describe Listings::BqSync do
       expect(result).to include(created: 1, errors: 1)
       expect(call_count).to eq(2)
       expect(SyncState.find_by(key: "bq_listings").watermark_at).to eq(Time.utc(2026, 6, 12, 8))
+    end
+
+    it "does not advance the watermark when every fetched row fails" do
+      SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 1))
+      stub_bq([ bq_row(101), bq_row(102) ])
+      allow(Moderation::Runner).to receive(:call).and_raise("boom")
+
+      result = described_class.call
+
+      expect(result).to eq(error: true, errors: 2, fetched: 2)
+      expect(SyncState.find_by(key: "bq_listings").watermark_at).to eq(Time.utc(2026, 6, 1))
+    end
+
+    it "never moves the watermark backwards (concurrent overlapping runs)" do
+      SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 13))
+      stub_bq([ bq_row(101) ]) # listing_created_at 2026-06-12 08:00 < watermark
+
+      described_class.call
+
+      expect(SyncState.find_by(key: "bq_listings").watermark_at).to eq(Time.utc(2026, 6, 13))
     end
 
     it "leaves the watermark untouched when the BigQuery query fails" do

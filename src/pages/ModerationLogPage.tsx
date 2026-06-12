@@ -319,7 +319,7 @@ function ResultRow({ result, listing, scan }: { result: any; listing: any; scan?
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">Content Quality</div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
                 <div><span className="text-muted-foreground">Images:</span> {listing?.imageCount != null ? listing.imageCount : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
-                <div><span className="text-muted-foreground">Avg Img:</span> {listing?.avgImageWidth != null && listing?.avgImageHeight != null ? `${listing.avgImageWidth}×${listing.avgImageHeight}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
+                <div><span className="text-muted-foreground">Avg Img:</span> {listing?.avgImageWidth != null && listing?.avgImageHeight != null ? `${Math.round(listing.avgImageWidth)}×${Math.round(listing.avgImageHeight)}px` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                 <div><span className="text-muted-foreground">LQI:</span> {listing?.lqi != null ? `${listing.lqi}%` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
                 <div><span className="text-muted-foreground">Desc length:</span> {listing?.descriptionLength != null ? `${listing.descriptionLength} chars` : <span className="font-mono text-[10px] text-gray-400 italic">null</span>}</div>
               </div>
@@ -447,7 +447,7 @@ export default function ModerationLogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [aiScanFilter, setAiScanFilter] = useState<string>("all"); // "all", "flagged", "reject", "review", "ok"
 
-  const { data: allResults } = useApiQuery(apiClient.moderation.recent, {
+  const { data: allResults, error: resultsError, refetch: refetchResults } = useApiQuery(apiClient.moderation.recent, {
     limit: 200,
   });
   const { data: filteredResults } = useApiQuery(
@@ -479,7 +479,7 @@ export default function ModerationLogPage() {
     }
 
     if (!searchQuery) return true;
-    const listing = listingMap.get(r.listingId);
+    const listing = r.listing ?? listingMap.get(r.listingId);
     const q = searchQuery.toLowerCase();
     return (
       r.jeId?.toLowerCase().includes(q) ||
@@ -618,7 +618,14 @@ export default function ModerationLogPage() {
       </div>
 
       {/* Results list */}
-      {!results ? (
+      {resultsError && !results ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+            <p className="text-sm">Failed to load moderation results: {resultsError.message}</p>
+            <Button variant="outline" size="sm" onClick={() => refetchResults()}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : !results ? (
         <div className="flex justify-center py-12">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
@@ -647,7 +654,7 @@ export default function ModerationLogPage() {
                 <ResultRow
                   key={r._id}
                   result={r}
-                  listing={listingMap.get(r.listingId)}
+                  listing={r.listing ?? listingMap.get(r.listingId)}
                   scan={scanMap.get(r.listingId)}
                 />
               ))}
