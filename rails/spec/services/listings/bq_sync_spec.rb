@@ -51,6 +51,23 @@ RSpec.describe Listings::BqSync do
     expect(sql).to include("LIMIT 300")
   end
 
+  it "applies a settle ceiling so only listings with synced child data are moderated" do
+    sql = described_class.send(:build_sql, countries: described_class::COUNTRIES, limit: 300)
+    expect(sql).to include("l.listing_created_at <= @ceiling")
+
+    expect(Integrations::BigqueryClient).to receive(:configured?).and_return(true)
+    captured = nil
+    allow(Integrations::BigqueryClient).to receive(:query) do |_sql, params:|
+      captured = params
+      []
+    end
+    SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 1))
+    described_class.call
+    # ceiling is ~SETTLE_HOURS in the past, well before "now"
+    expect(captured[:ceiling]).to be <= described_class::SETTLE_HOURS.hours.ago + 1.minute
+    expect(captured[:ceiling]).to be > (described_class::SETTLE_HOURS + 1).hours.ago
+  end
+
   it "sanitizes test-run country input down to letters before interpolating" do
     sql = described_class.send(:build_sql, countries: [ "fr", "it' OR 1=1--", "" ], limit: 50)
     expect(sql).to include("country_code IN ('FR', 'ITOR')")
