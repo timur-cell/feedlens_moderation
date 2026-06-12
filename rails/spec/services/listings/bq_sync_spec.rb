@@ -44,8 +44,38 @@ RSpec.describe Listings::BqSync do
     allow(Integrations::BigqueryClient).to receive(:query).and_return(rows)
   end
 
-  it "limits the batch to the initial country scope" do
-    expect(described_class::SQL).to include("l.country_code IN ('ES', 'PT')")
+  it "limits the cron batch to the configured country scope, newest-first" do
+    sql = described_class.send(:build_sql, countries: described_class::COUNTRIES, limit: 300)
+    expect(sql).to include("country_code IN ('ES', 'PT')")
+    expect(sql).to include("ORDER BY l.listing_created_at DESC")
+    expect(sql).to include("LIMIT 300")
+  end
+
+  it "sanitizes test-run country input down to letters before interpolating" do
+    sql = described_class.send(:build_sql, countries: [ "fr", "it' OR 1=1--", "" ], limit: 50)
+    expect(sql).to include("country_code IN ('FR', 'ITOR')")
+    expect(sql).not_to include("1=1")
+  end
+
+  describe ".test_run" do
+    it "moderates the requested countries without touching the cron watermark" do
+      SyncState.create!(key: "bq_listings", watermark_at: Time.utc(2026, 6, 1))
+      stub_bq([ bq_row(301, country_code: "FR"), bq_row(302, country_code: "IT") ])
+
+      result = described_class.test_run(countries: %w[FR IT], limit: 50, since: Time.utc(2026, 6, 1))
+
+      expect(result).to include(created: 2, fetched: 2, countries: %w[FR IT], limit: 50)
+      expect(result[:batch_id]).to eq("bq-test-#{Time.current.utc.to_date.iso8601}")
+      expect(result[:outcomes]).to be_a(Hash)
+      expect(Listing.where("batch_id LIKE 'bq-test-%'").count).to eq(2)
+      # cron watermark left exactly as it was
+      expect(SyncState.find_by(key: "bq_listings").watermark_at).to eq(Time.utc(2026, 6, 1))
+    end
+
+    it "no-ops when credentials are not configured" do
+      allow(Integrations::BigqueryClient).to receive(:configured?).and_return(false)
+      expect(described_class.test_run).to eq(skipped: true)
+    end
   end
 
   it "no-ops when BigQuery credentials are not configured" do

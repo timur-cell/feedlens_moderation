@@ -13,6 +13,10 @@ dist/
 # Mounted secrets (BigQuery service-account key)
 secrets/
 
+# Loose credential files dropped in the repo root (never commit API keys)
+anthropic.env
+*.key.json
+
 # Convex generated files
 convex/_generated/
 
