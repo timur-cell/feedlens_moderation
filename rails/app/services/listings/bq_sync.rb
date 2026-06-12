@@ -7,7 +7,11 @@ module Listings
   # which also makes re-runs after a mid-batch failure idempotent.
   class BqSync
     WATERMARK_KEY = "bq_listings".freeze
-    MAX_LISTINGS_PER_RUN = 10_000 # daily new-listing volume is ~7,400 worldwide
+    # Per-run cap (Timur, 2026-06-12): keep batches small and cheap. ES/PT
+    # new-listing volume is ~640/day, so a backlog accumulates; nothing is
+    # lost — the watermark only advances to the last processed row and the
+    # remainder is picked up on subsequent runs (cap hit logs a warn).
+    MAX_LISTINGS_PER_RUN = 300
     # Initial rollout scope — widen once volume/cost look good. Listings
     # created outside the scope are not backfilled when it widens (the
     # watermark will already have passed them).
