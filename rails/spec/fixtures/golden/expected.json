@@ -667,5 +667,29 @@
     "needsLlm": false,
     "llmRuleMatches": [],
     "sellerMessage": "Duplicate listings for the same property within a single account are not allowed."
+  },
+  {
+    "label": "rental_skips_price_floor_pt",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "por_rental_skips_low_price",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
+  },
+  {
+    "label": "dubai_rental_skips_ppsqm",
+    "matches": [],
+    "outcome": "approved",
+    "needsLlm": false,
+    "llmRuleMatches": [],
+    "sellerMessage": null
   }
 ]

@@ -808,6 +808,24 @@
       "label": "duplicates_spain_reject",
       "listing": { "jeId": "g066", "title": "Villa duplicate test", "description": "Villa listed twice by the same office to exercise duplicate handling.", "country": "ES", "office": "999", "duplicatesOriginalListing": true, "priceUsd": 900000, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 60, "descriptionLength": 80, "realEstateType": "villa" },
       "expect": { "outcome": "rejected", "mustMatch": [ "duplicates_within_single_account_spain" ] }
+    },
+    {
+      "label": "rental_skips_price_floor_pt",
+      "note": "prod regression bq-sync-2026-06-12: monthly rental price must not trip the RE sale floor (nonRentalOnly on price_too_low_re)",
+      "listing": { "jeId": "g067", "title": "Lisboa apartment for long stay", "description": "Bright furnished apartment near the river with balcony and lift access.", "country": "PT", "priceUsd": 3000, "rental": true, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment", "officeSubscription": "premium" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "price_too_low_re" ] }
+    },
+    {
+      "label": "por_rental_skips_low_price",
+      "note": "POR rental with a monthly price must not trip the POR sale floor (nonRentalOnly on por_low_price)",
+      "listing": { "jeId": "g068", "title": "Seafront flat for seasonal stay", "description": "Furnished seafront flat available for seasonal stays with terrace access.", "country": "ES", "priceOnRequest": true, "priceUsd": 5000, "rental": true, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment", "officeSubscription": "premium" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "por_low_price", "price_too_low_re" ] }
+    },
+    {
+      "label": "dubai_rental_skips_ppsqm",
+      "note": "AE rental ppsqm is monthly-derived and must not trip the Dubai sale ppsqm floor (nonRentalOnly on dubai_price_sqm)",
+      "listing": { "jeId": "g069", "title": "Marina view apartment for seasonal stay", "description": "High-floor furnished unit overlooking the marina available for long stays.", "country": "Dubai", "priceUsd": 150000, "pricePerSqm": 800, "rental": true, "imageCount": 8, "avgImageWidth": 1200, "avgImageHeight": 800, "lqi": 70, "descriptionLength": 120, "realEstateType": "apartment" },
+      "expect": { "outcome": "approved", "mustNotMatch": [ "dubai_price_sqm" ] }
     }
   ]
 }
