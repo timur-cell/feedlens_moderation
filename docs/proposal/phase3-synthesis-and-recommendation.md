@@ -130,8 +130,13 @@ system. Those are roadmap items (§3), gated on v1 being reliable and measured.
   `approved`. Keep auto-approve only for genuinely no-match-clean listings.
 - **Repair the dead rules / data plumbing** (all confirmed against the production
   export):
-  - Populate `price_usd` (convert at ingest) **or** make price rules currency-aware;
-    today 23 rules compare USD thresholds to raw EUR/GBP/AED. `fetch_and_moderate.rb:62`.
+  - Populate `price_usd` at ingest. **Owner's input (2026-06): JamesEdition
+    already auto-converts prices to USD in its own code** — so the fix is
+    plumbing, not building an FX service: identify the USD field in the JE
+    API / push payload (the current `JeClient` parses only `price`/`currency`
+    and `fetch_and_moderate.rb` hardcodes `price_usd: nil`) and map it
+    through. Until that lands, 23 `priceUsd` rules compare USD thresholds
+    against raw EUR/GBP/AED via the `price_of` fallback;
   - Add a field-name alias map (or rename rule fields) so `gptCondition`/`gptConclusion`/
     `gptWatermarkSold`/`gptImageType`/`viktor*` resolve to the hash keys the engine
     actually exposes. `rule_evaluator.rb:206`, `runner.rb:142-143`.

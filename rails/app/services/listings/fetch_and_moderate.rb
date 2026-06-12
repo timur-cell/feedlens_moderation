@@ -73,6 +73,9 @@ module Listings
           title: data[:title],
           price: data[:price],
           currency: data[:currency],
+          # JE already converts prices to USD upstream; map that payload field
+          # here once identified — 23 priceUsd rules depend on it (do NOT build
+          # a separate FX service for this).
           price_usd: nil,
           price_on_request: data[:price_on_request],
           category: data[:category] || "real_estate",

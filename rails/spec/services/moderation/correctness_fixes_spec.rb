@@ -78,6 +78,11 @@ RSpec.describe "Moderation engine correctness fixes" do
     # either real listing keys or known aliases. Rules that depend on signals
     # the pipeline does not yet produce are listed explicitly so the gap is
     # visible rather than silent.
+    #
+    # priceUsd is in the same boat but tracked separately: JamesEdition already
+    # converts prices to USD upstream, so the fix is to map that field from the
+    # JE API / push payload at ingest (fetch_and_moderate.rb currently
+    # hardcodes price_usd: nil) — not to build an FX service here.
     KNOWN_UNPRODUCED_FIELDS = %w[
       gptWatermarkSold gptWatermarkLarge duplicatesOriginalListing
       viktorReject viktorApprove viktorFlagged manualReview
