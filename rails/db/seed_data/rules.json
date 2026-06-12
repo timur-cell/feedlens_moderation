@@ -923,7 +923,8 @@
     "description"
    ]
   },
-  "sellerMessage": "Your listing appears to be a new development or off-plan project. These listings require additional review."
+  "sellerMessage": "Your listing appears to be a new development or off-plan project. These listings require additional review.",
+  "enabled": false
  },
  {
   "name": "duplicates_within_single_account_us",
