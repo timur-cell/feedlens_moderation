@@ -7,10 +7,11 @@ module Listings
   # which also makes re-runs after a mid-batch failure idempotent.
   class BqSync
     WATERMARK_KEY = "bq_listings".freeze
-    # Per-run cap (Timur, 2026-06-12): keep batches small and cheap. ES/PT
-    # new-listing volume is ~640/day, so a backlog accumulates; nothing is
-    # lost — the watermark only advances to the last processed row and the
-    # remainder is picked up on subsequent runs (cap hit logs a warn).
+    # Per-run cap (Timur, 2026-06-12): each run takes the NEWEST listings in
+    # the window — freshest first, no backlog. On days with more than the cap
+    # (ES/PT inflow is ~640/day) the older remainder is permanently skipped:
+    # the watermark advances past it and the design is no-backfill (cap hit
+    # logs a warn with the skip count).
     MAX_LISTINGS_PER_RUN = 300
     # Initial rollout scope — widen once volume/cost look good. Listings
     # created outside the scope are not backfilled when it widens (the
@@ -32,7 +33,7 @@ module Listings
           AND l.type IN ('Listing::RealEstateListing', 'Listing::CarListing')
           AND l.country_code IN (#{COUNTRIES.map { |c| "'#{c}'" }.join(", ")})
           AND l.listing_created_at > @watermark
-        ORDER BY l.listing_created_at
+        ORDER BY l.listing_created_at DESC
         LIMIT #{MAX_LISTINGS_PER_RUN}
       ),
       images AS (
@@ -85,7 +86,7 @@ module Listings
 
         if rows.length >= MAX_LISTINGS_PER_RUN
           Rails.logger.warn("BQ sync: per-run cap #{MAX_LISTINGS_PER_RUN} reached — " \
-                            "batch truncated; remainder picked up next run")
+                            "older listings in the window are skipped (newest-first, no backfill)")
         end
 
         created = 0
