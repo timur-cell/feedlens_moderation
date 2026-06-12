@@ -125,6 +125,12 @@ module Listings
         end
       end
 
+      def compute_price_per_sqm(price, living_area)
+        return nil unless price.is_a?(Numeric) && price.positive? && living_area.is_a?(Numeric) && living_area.positive?
+
+        (price.to_f / living_area).round
+      end
+
       private
 
       def process_input(trimmed, moderator:)
@@ -244,12 +250,6 @@ module Listings
         listing.imported_at = now_ms
         listing.save!
         listing
-      end
-
-      def compute_price_per_sqm(price, living_area)
-        return nil unless price.is_a?(Numeric) && price.positive? && living_area.is_a?(Numeric) && living_area.positive?
-
-        (price.to_f / living_area).round
       end
 
       def should_run_vision?(country)

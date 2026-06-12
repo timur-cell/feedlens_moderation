@@ -10,6 +10,9 @@ dist/
 .env.*.local
 .env.production
 
+# Mounted secrets (BigQuery service-account key)
+secrets/
+
 # Convex generated files
 convex/_generated/
 

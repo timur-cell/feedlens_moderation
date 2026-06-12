@@ -8,17 +8,20 @@ module Moderation
     MAX_VISION_IMAGES = 10
 
     class << self
-      def call(listing, moderator: nil)
+      def call(listing, moderator: nil, param_scan: true)
         settings = Setting.current
 
         # 0. AI Parameter Scan. Failure is non-blocking — the scan doesn't
-        #    affect the moderation outcome.
+        #    affect the moderation outcome. Batch callers (BQ sync) skip it
+        #    to avoid one Claude call per listing.
         ai_scan =
-          begin
-            Ai::ParamScan.call(listing)
-          rescue StandardError => e
-            Rails.logger.error("AI Param Scan failed (non-blocking): #{e.message}")
-            nil
+          if param_scan
+            begin
+              Ai::ParamScan.call(listing)
+            rescue StandardError => e
+              Rails.logger.error("AI Param Scan failed (non-blocking): #{e.message}")
+              nil
+            end
           end
 
         # 1. Rules + lists + engine
