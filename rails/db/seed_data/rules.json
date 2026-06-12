@@ -85,7 +85,7 @@
   "name": "price_too_low_re",
   "listingCategory": "real_estate",
   "displayName": "Price Below Minimum (RE Sale)",
-  "description": "RE sale listing below $490K in EU countries. Auto-reject.",
+  "description": "RE sale listing below $490K in EU countries. Excludes rentals. Auto-reject.",
   "category": "simple_code",
   "tier": "auto",
   "action": "reject",
@@ -110,7 +110,8 @@
     "GR",
     "IT",
     "PT"
-   ]
+   ],
+   "nonRentalOnly": true
   },
   "sellerMessage": "Your listing price is below the minimum threshold for JamesEdition in this market. Please verify your price or contact support if you believe this is an error."
  },
@@ -118,7 +119,7 @@
   "name": "too_low_price_430k",
   "listingCategory": "real_estate",
   "displayName": "Very Low Price (<$430K EU)",
-  "description": "RE sale under $430K in ES/FR/GR/IT/PT. AI-verified — auto-decides if ≥90% confident.",
+  "description": "RE sale under $430K in ES/FR/GR/IT/PT. Excludes rentals. AI-verified — auto-decides if ≥90% confident.",
   "category": "former_manual",
   "tier": "verify",
   "action": "notice",
@@ -143,7 +144,8 @@
     "GR",
     "IT",
     "PT"
-   ]
+   ],
+   "nonRentalOnly": true
   },
   "sellerMessage": "Your listing price appears low for JamesEdition's luxury marketplace. Please verify your pricing."
  },
@@ -308,7 +310,7 @@
   "name": "dubai_price_sqm",
   "listingCategory": "real_estate",
   "displayName": "Dubai Price/sqm Check",
-  "description": "AE listings with price/sqm ≤$1000. Suspiciously low for Dubai.",
+  "description": "AE sale listings with price/sqm ≤$1000. Suspiciously low for Dubai. Excludes rentals.",
   "category": "simple_code",
   "tier": "auto",
   "action": "reject",
@@ -335,7 +337,8 @@
     "house",
     "penthouse",
     "townhouse"
-   ]
+   ],
+   "nonRentalOnly": true
   },
   "sellerMessage": "The price per square meter for your Dubai listing appears unusually low. Please verify your listing price and living area, then resubmit."
  },
@@ -622,7 +625,7 @@
   "name": "por_low_price",
   "listingCategory": "real_estate",
   "displayName": "POR + Price <$450K (EU)",
-  "description": "Price on Request with listed price under $450K in key EU countries.",
+  "description": "Price on Request with listed sale price under $450K in key EU countries. Excludes rentals.",
   "category": "simple_code",
   "tier": "auto",
   "action": "reject",
@@ -652,7 +655,8 @@
     "IT",
     "PT",
     "US"
-   ]
+   ],
+   "nonRentalOnly": true
   },
   "sellerMessage": "Price on Request is not available for listings priced under $450,000 in this market. Please set a visible price or contact support."
  },
