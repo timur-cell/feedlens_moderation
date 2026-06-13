@@ -5,6 +5,7 @@ import { useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { PrecisionBar, SectionLabel, Sparkline } from "@/components/ops";
+import { QueryError } from "@/components/QueryError";
 import { formatAge, rulePrecision } from "@/lib/queueFormat";
 
 // Overview — "is the queue healthy and is automation trustworthy, at a glance".
@@ -127,6 +128,9 @@ export default function DashboardPage() {
         </Button>
       </div>
     );
+  }
+  if (error && !dashData) {
+    return <QueryError onRetry={refetch} />;
   }
   if (!dashData) {
     return (

@@ -18,6 +18,7 @@ import {
 import { useEffect, useState, useMemo } from "react";
 import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -884,7 +885,7 @@ function ListDetail({
 }
 
 export default function ListsPage() {
-  const { data: listsData } = useApiQuery(apiClient.lists.list);
+  const { data: listsData, error: listsError, refetch: refetchLists } = useApiQuery(apiClient.lists.list);
   const lists = listsData as ModerationList[] | undefined;
   const { data: rulesData } = useApiQuery(apiClient.rules.list);
   const rules = rulesData || [];
@@ -969,6 +970,9 @@ export default function ListsPage() {
     toast.success("Lists exported");
   };
 
+  if (listsError && !lists) {
+    return <QueryError onRetry={refetchLists} />;
+  }
   if (!lists) {
     return (
       <div className="flex items-center justify-center h-64">
