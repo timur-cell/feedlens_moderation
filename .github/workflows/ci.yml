@@ -1,0 +1,78 @@
+name: CI
+
+# Runs from the repository root so GitHub Actions actually picks it up.
+# (The previous workflow lived at rails/.github/workflows/ci.yml, a path
+# Actions never scans, so CI had never run on this repo.)
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  rails:
+    name: Rails (rspec, rubocop, brakeman, bundler-audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rails
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: rails
+          bundler-cache: true
+
+      - name: Security scan (Brakeman)
+        run: bin/brakeman --no-pager
+
+      - name: Dependency audit (bundler-audit)
+        run: bin/bundler-audit
+
+      - name: Lint (RuboCop)
+        run: bin/rubocop -f github
+
+      - name: Prepare test database
+        run: bin/rails db:test:prepare
+
+      - name: Tests (RSpec)
+        run: bundle exec rspec
+
+  frontend:
+    name: Frontend (typecheck, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build

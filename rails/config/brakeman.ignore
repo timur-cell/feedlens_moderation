@@ -1,0 +1,13 @@
+{
+  "ignored_warnings": [
+    {
+      "fingerprint": "625c417ceed2fb61fa2b37b55af05fc5650bd3b40567c4c4549e154fb7ebe356",
+      "note": "False positive. pg_try_advisory_lock takes two integers: ADVISORY_LOCK_CLASS is a frozen integer constant and the id is wrapped in Integer(...), which raises on any non-integer. No user-controlled string reaches the SQL. See Moderation::Runner#with_listing_lock."
+    },
+    {
+      "fingerprint": "6dcb77d5af3392dcd63d260318f775d49c276e81aade6af447691f068b6c63d3",
+      "note": "False positive. pg_advisory_unlock mirrors the lock above: ADVISORY_LOCK_CLASS constant + Integer(...)-cast id, no user-controlled string. See Moderation::Runner#with_listing_lock."
+    }
+  ],
+  "brakeman_version": "8.0.4"
+}

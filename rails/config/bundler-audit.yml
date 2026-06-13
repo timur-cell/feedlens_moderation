@@ -2,4 +2,10 @@
 # CVEs that are not relevant to the application can be enumerated on the ignore list below.
 
 ignore:
-  - CVE-THAT-DOES-NOT-APPLY
+  # Two Devise advisories that live in modules this app does not enable. The
+  # Moderator model uses only :database_authenticatable, :recoverable,
+  # :rememberable, :validatable (app/models/moderator.rb) — neither Confirmable
+  # nor Timeoutable is on, so neither code path is reachable. The only published
+  # fix is the Devise 5.x major release; revisit these on a Devise 5 upgrade.
+  - CVE-2026-32700  # Confirmable "change email" race — Confirmable not enabled
+  - CVE-2026-40295  # Timeoutable open-redirect via request.referrer — Timeoutable not enabled

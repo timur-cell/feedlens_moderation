@@ -2,6 +2,9 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# NOTE: the Omakase default prepends "--ensure-latest", which makes the scan
+# exit non-zero (and skip scanning entirely) the moment a newer Brakeman is
+# published upstream — turning CI red on an unrelated release. Brakeman is
+# pinned via the Gemfile and bumped by Dependabot, so we drop the flag here.
 
 load Gem.bin_path("brakeman", "brakeman")
