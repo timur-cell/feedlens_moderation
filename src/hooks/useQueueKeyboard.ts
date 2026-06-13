@@ -30,6 +30,13 @@ function isEditableTarget(el: EventTarget | null): boolean {
   const tag = el.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   if (el.isContentEditable) return true;
+  // Radix Select / dropdown triggers render as a button with role="combobox"
+  // (or aria-haspopup). Treat them as editable so A/R/N/S/F don't fire a real
+  // moderation decision while a Rule/Country/Sort/Template/Reason facet is focused.
+  if (el.getAttribute("role") === "combobox" ||
+      el.closest('[role="combobox"],[aria-haspopup="listbox"],[aria-haspopup="menu"]')) {
+    return true;
+  }
   // Radix dialogs/menus set role; let their own handlers run.
   if (el.closest('[role="menu"],[role="listbox"],[role="dialog"] input,[role="dialog"] textarea')) {
     // still allow Esc through (handled below via the raw key)

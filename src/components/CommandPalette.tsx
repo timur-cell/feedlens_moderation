@@ -126,7 +126,7 @@ export function CommandPalette() {
             <MessageSquare />
             <span>Messages</span>
           </CommandItem>
-          <CommandItem value="team users moderators" onSelect={() => go("/settings?tab=team")}>
+          <CommandItem value="team users moderators" onSelect={() => go("/team")}>
             <Users />
             <span>Team</span>
           </CommandItem>

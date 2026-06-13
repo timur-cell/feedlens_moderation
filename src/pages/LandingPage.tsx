@@ -65,7 +65,7 @@ export function LandingPage() {
           <div className="flex items-center justify-center gap-6 pt-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Check className="size-4 text-emerald-500" />
-              <span>81 moderation rules</span>
+              <span>68 moderation rules</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="size-4 text-emerald-500" />
