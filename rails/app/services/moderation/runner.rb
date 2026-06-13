@@ -116,6 +116,8 @@ module Moderation
           )
           listing.update!(moderation_status: outcome)
           update_rule_stats(camel_matches)
+          # Shadow rules: record would-have-matched without affecting outcome.
+          update_shadow_stats(engine.shadow_match_names(listing_hash))
         end
 
         {
@@ -195,7 +197,8 @@ module Moderation
           "action" => rule.action,
           "priority" => rule.priority,
           "config" => rule.config || {},
-          "sellerMessage" => rule.seller_message
+          "sellerMessage" => rule.seller_message,
+          "shadow" => rule.shadow
         }
       end
 
@@ -280,6 +283,16 @@ module Moderation
         now_ms = (Time.current.to_f * 1000).to_i
         Rule.where(name: names)
             .update_all([ "match_count = COALESCE(match_count, 0) + 1, last_matched_at = ?", now_ms ])
+      end
+
+      # Shadow rules don't act, but we record that they would have matched so
+      # the Rules screen can show shadow performance before promoting to live.
+      def update_shadow_stats(names)
+        return if names.blank?
+
+        now_ms = (Time.current.to_f * 1000).to_i
+        Rule.where(name: names)
+            .update_all([ "shadow_match_count = COALESCE(shadow_match_count, 0) + 1, last_matched_at = ?", now_ms ])
       end
 
       # Session-scoped pg advisory lock keyed on the listing id. Yields true

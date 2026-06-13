@@ -27,22 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const VIEWS_KEY = "feedlens.decisions.views";
-
-interface SavedView {
-  id: string;
-  name: string;
-  query: string;
-}
-
-function loadViews(): SavedView[] {
-  try {
-    return JSON.parse(localStorage.getItem(VIEWS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
 function timeLabel(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
@@ -236,12 +220,14 @@ export default function ModerationLogPage() {
   const [ruleFilter, setRuleFilter] = useState(() => searchParams.get("rule") || "any");
   const [country, setCountry] = useState(() => searchParams.get("country") || "any");
   const [dateRange, setDateRange] = useState(() => searchParams.get("date") || "7d");
-  const [views, setViews] = useState<SavedView[]>(loadViews);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: results, error, refetch } = useApiQuery(apiClient.moderation.recent, { limit: 300 });
+  const { data: views, refetch: refetchViews } = useApiQuery(apiClient.savedViews.list, { scope: "decisions" });
   const [override] = useApiMutation(apiClient.moderation.override);
   const [rerun] = useApiMutation(apiClient.moderateById.run);
+  const [createView] = useApiMutation(apiClient.savedViews.create);
+  const [removeView] = useApiMutation(apiClient.savedViews.remove);
 
   // Keep the URL in sync (shareable filtered view).
   useEffect(() => {
@@ -309,8 +295,8 @@ export default function ModerationLogPage() {
     setDateRange("7d");
   }, []);
 
-  const applyView = useCallback((v: SavedView) => {
-    const p = new URLSearchParams(v.query);
+  const applyView = useCallback((query: string) => {
+    const p = new URLSearchParams(query);
     setSearch(p.get("q") || "");
     setOutcome(p.get("outcome") || "all");
     setSource(p.get("source") || "all");
@@ -319,23 +305,28 @@ export default function ModerationLogPage() {
     setDateRange(p.get("date") || "7d");
   }, []);
 
-  const saveCurrentView = useCallback(() => {
+  const saveCurrentView = useCallback(async () => {
     const name = window.prompt("Name this view");
     if (!name) return;
-    const v: SavedView = { id: String(Date.now()), name, query: searchParams.toString() };
-    const next = [...views, v];
-    setViews(next);
-    localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
-    toast.success(`Saved view “${name}”`);
-  }, [views, searchParams]);
+    try {
+      await createView({ name, query: searchParams.toString(), scope: "decisions" });
+      await refetchViews();
+      toast.success(`Saved view “${name}”`);
+    } catch {
+      toast.error("Failed to save view");
+    }
+  }, [createView, refetchViews, searchParams]);
 
   const deleteView = useCallback(
-    (id: string) => {
-      const next = views.filter((v) => v.id !== id);
-      setViews(next);
-      localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
+    async (id: string) => {
+      try {
+        await removeView({ id });
+        await refetchViews();
+      } catch {
+        toast.error("Failed to delete view");
+      }
     },
-    [views],
+    [removeView, refetchViews],
   );
 
   const exportCsv = useCallback(() => {
@@ -470,15 +461,20 @@ export default function ModerationLogPage() {
       {/* Saved views */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2">
         <SectionLabel className="mr-1">Saved views</SectionLabel>
-        {views.map((v) => (
+        {(views || []).map((v: any) => (
           <span
-            key={v.id}
+            key={v._id}
             className="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border bg-background px-1.5 text-[11px]"
           >
-            <button type="button" onClick={() => applyView(v)} className="hover:text-je-teal">
+            <button type="button" onClick={() => applyView(v.query)} className="hover:text-je-teal">
               {v.name}
             </button>
-            <button type="button" onClick={() => deleteView(v.id)} className="text-je-ink-3 hover:text-je-error">
+            <button
+              type="button"
+              aria-label={`Delete view ${v.name}`}
+              onClick={() => deleteView(v._id)}
+              className="text-je-ink-3 hover:text-je-error"
+            >
               ✕
             </button>
           </span>

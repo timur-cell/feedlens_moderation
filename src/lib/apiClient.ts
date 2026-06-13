@@ -320,6 +320,15 @@ export const apiClient = {
       request<any[]>("GET", "/api/param-scans/recent", { params: args }),
   },
 
+  savedViews: {
+    list: (args?: { scope?: string }) =>
+      request<any[]>("GET", "/api/saved-views", { params: args }),
+    create: (args: { name: string; query: string; scope?: string }) =>
+      request<any>("POST", "/api/saved-views", { body: args }),
+    remove: ({ id }: { id: string }) =>
+      request<any>("DELETE", `/api/saved-views/${id}`),
+  },
+
   remediation: {
     stats: () => request<any>("GET", "/api/remediation/stats"),
     recent: (args?: { limit?: number; offset?: number }) =>

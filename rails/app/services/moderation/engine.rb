@@ -44,7 +44,14 @@ module Moderation
 
       # Sort by priority. JS Array#sort is stable; Ruby sort_by is not, so
       # tie-break on the original index.
-      @rules = resolved.each_with_index.sort_by { |r, i| [ r["priority"], i ] }.map(&:first)
+      sorted = resolved.each_with_index.sort_by { |r, i| [ r["priority"], i ] }.map(&:first)
+
+      # Shadow rules are evaluated separately (would-have-matched, for
+      # reporting) and never contribute to the outcome — keep them out of the
+      # live set so the deterministic flow is byte-identical when nothing is
+      # shadowed (preserves the golden-fixture parity).
+      @rules = sorted.reject { |r| r["shadow"] == true }
+      @shadow_rules = sorted.select { |r| r["shadow"] == true }
     end
 
     # Deterministic phase of moderateListing. Returns a Hash:
@@ -192,6 +199,31 @@ module Moderation
 
       # Below threshold -> manual queue
       result_hash(matches, "manual", needs_llm: true, llm_rule_matches: llm_rule_matches, confidence: confidence)
+    end
+
+    # Names of shadow rules that WOULD have matched this listing. Pure
+    # evaluation with no side effects on the outcome — drives the per-rule
+    # shadow performance counter (would-have-matched). Mirrors the category
+    # dispatch used in #evaluate.
+    def shadow_match_names(listing)
+      return [] if @shadow_rules.nil? || @shadow_rules.empty?
+
+      has_vision_data = !listing["chatGptPropertyCondition"].nil?
+      @shadow_rules.filter_map do |rule|
+        config = rule["config"] || {}
+        result =
+          if rule["category"] == "hybrid_vision"
+            next unless has_vision_data
+            RuleEvaluator.evaluate_hybrid_vision(listing, config)
+          elsif JsCompat.js_truthy?(config["officeIds"]) || JsCompat.js_truthy?(config["officeNames"])
+            RuleEvaluator.evaluate_office(listing, config)
+          elsif JsCompat.js_truthy?(config["patterns"]) || JsCompat.js_truthy?(config["textLists"])
+            RuleEvaluator.evaluate_regex(listing, config)
+          else
+            RuleEvaluator.evaluate_simple(listing, config)
+          end
+        rule["name"] if result[:matched]
+      end
     end
 
     private

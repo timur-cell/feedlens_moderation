@@ -97,6 +97,10 @@ module Api
       ActiveRecord::Base.transaction do
         result.update!(patch)
         result.listing.update!(listing_patch)
+        # Override-feedback loop: a "false positive" override means the rules
+        # that fired were wrong — bump their false-positive count so per-rule
+        # precision (1 − fp/matches) reflects it.
+        record_false_positives!(result) if params[:reason].to_s == "false_positive"
       end
 
       log_activity(
@@ -107,6 +111,16 @@ module Api
                  "#{listing_patch[:moderation_locked] ? ' (locked permanently)' : ''}" \
                  "#{params[:reason].present? ? ". Reason: #{params[:reason]}" : ''}"
       )
+    end
+
+    # Atomic per-rule false-positive increment for every rule that fired in
+    # this result (the synthetic llm_assessment row is not a real rule).
+    def record_false_positives!(result)
+      names = (result.rule_matches || []).filter_map { |m| m["ruleName"] }.uniq - [ "llm_assessment" ]
+      return if names.empty?
+
+      Rule.where(name: names)
+          .update_all("false_positive_count = COALESCE(false_positive_count, 0) + 1")
     end
   end
 end

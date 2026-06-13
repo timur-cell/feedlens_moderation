@@ -59,6 +59,11 @@ Rails.application.routes.draw do
     delete "rules/:id", to: "rules#destroy"
     post "rules/:id/toggle", to: "rules#toggle"
 
+    # --- Saved views (per-moderator filter sets) -----------------------------
+    get "saved-views", to: "saved_views#index"
+    post "saved-views", to: "saved_views#create"
+    delete "saved-views/:id", to: "saved_views#destroy"
+
     # --- Lists ---------------------------------------------------------------
     get "lists", to: "lists#index"
     post "lists", to: "lists#create"

@@ -5,6 +5,7 @@ class Moderator < ApplicationRecord
   devise :database_authenticatable, :recoverable, :rememberable, :validatable
 
   has_many :moderator_activities, dependent: :destroy
+  has_many :saved_views, dependent: :destroy
 
   before_validation :normalize_email
   before_create :set_created_at_ms
