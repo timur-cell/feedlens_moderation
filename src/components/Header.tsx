@@ -16,25 +16,14 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           <Link
             to="/"
-            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+            className="flex flex-col gap-1 hover:opacity-80 transition-opacity"
           >
-            <div className="size-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <svg className="size-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-                <line x1="8" y1="8" x2="14" y2="8" />
-                <line x1="8" y1="11" x2="14" y2="11" />
-                <line x1="8" y1="14" x2="14" y2="14" />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="hidden sm:inline font-semibold text-lg leading-tight">
-                Feed<span className="text-blue-600">Lens</span>
-              </span>
-              <span className="hidden sm:inline text-[10px] text-muted-foreground leading-none tracking-wide">
-                moderation
-              </span>
-            </div>
+            <span className="font-serif text-[24px] font-medium leading-none tracking-[0.02em]">
+              Feed<span className="text-je-teal">Lens</span>
+            </span>
+            <span className="hidden sm:inline text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-je-ink-3">
+              JamesEdition · T&amp;S
+            </span>
           </Link>
 
           <nav className="flex items-center gap-2">

@@ -11,19 +11,12 @@ export function LoginPage() {
 
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <div className="mx-auto size-12 rounded-xl bg-blue-600 flex items-center justify-center mb-4">
-            <svg className="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-              <line x1="8" y1="8" x2="14" y2="8" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-              <line x1="8" y1="14" x2="14" y2="14" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Feed<span className="text-blue-600">Lens</span>
+          <h1 className="font-serif text-[36px] font-medium leading-none tracking-[0.02em]">
+            Feed<span className="text-je-teal">Lens</span>
           </h1>
-          <p className="text-xs text-muted-foreground tracking-wide">moderation</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-je-ink-3">
+            JamesEdition · T&amp;S
+          </p>
           <p className="text-muted-foreground text-sm pt-1">
             Sign in to your account to continue
           </p>

@@ -12,6 +12,7 @@ export type KeyHandlers = Partial<{
   next: () => void; // J / ArrowDown
   prev: () => void; // K / ArrowUp
   approve: () => void; // A
+  approveForever: () => void; // Shift+A — approve and lock against re-moderation
   reject: () => void; // R
   notice: () => void; // N
   skip: () => void; // S
@@ -79,7 +80,7 @@ export function useQueueKeyboard(handlers: KeyHandlers, enabled = true) {
           break;
         case "a":
         case "A":
-          fire(h.approve);
+          fire(e.shiftKey ? (h.approveForever ?? h.approve) : h.approve);
           break;
         case "r":
         case "R":
