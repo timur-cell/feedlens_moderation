@@ -488,7 +488,15 @@ export default function QueuePage() {
     }
   }, [pendingData, queue]);
 
-  const resultFor = useCallback((l: Listing | undefined) => (l ? resultByListing.get(l._id) : undefined), [resultByListing]);
+  // Prefer the recent-feed result, but fall back to the result embedded in the
+  // pending payload (`latestResult`). Manual items older than the recent-300
+  // window aren't in resultByListing, and without this fallback their decisions
+  // silently no-op ("No moderation result for this listing yet").
+  const resultFor = useCallback(
+    (l: Listing | undefined): Result | undefined =>
+      l ? (resultByListing.get(l._id) ?? (l as Listing & { latestResult?: Result }).latestResult ?? undefined) : undefined,
+    [resultByListing],
+  );
   const topRule = useCallback(
     (l: Listing) => resultFor(l)?.ruleMatches?.[0]?.ruleName ?? null,
     [resultFor],

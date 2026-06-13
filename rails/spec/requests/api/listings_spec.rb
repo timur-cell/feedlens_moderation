@@ -22,6 +22,30 @@ RSpec.describe "Api listings", type: :request do
       expect(json.first["jeId"]).to eq(new.je_id)
       expect(json.first["moderationStatus"]).to eq("manual")
     end
+
+    it "embeds each listing's latest moderation result as latestResult" do
+      listing = create(:listing, moderation_status: "manual")
+      create(:moderation_result, listing: listing, outcome: "manual",
+                                 rule_matches: [ { "ruleName" => "stale_rule" } ], processed_at: 1_000)
+      latest = create(:moderation_result, listing: listing, outcome: "manual",
+                                          rule_matches: [ { "ruleName" => "ai_images_description" } ], processed_at: 9_000)
+      sign_in_as(create(:moderator))
+
+      get "/api/listings/pending"
+      result = json.first["latestResult"]
+      expect(result).to be_present
+      expect(result["_id"]).to eq(latest.id.to_s)
+      expect(result["ruleMatches"].first["ruleName"]).to eq("ai_images_description")
+    end
+
+    it "sets latestResult to null when a manual listing has no result yet" do
+      create(:listing, moderation_status: "manual")
+      sign_in_as(create(:moderator))
+
+      get "/api/listings/pending"
+      expect(json.first).to have_key("latestResult")
+      expect(json.first["latestResult"]).to be_nil
+    end
   end
 
   describe "GET /api/listings/recent" do
