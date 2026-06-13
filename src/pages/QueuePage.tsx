@@ -878,9 +878,11 @@ export default function QueuePage() {
           </p>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[400px_1fr]">
-          {/* List pane */}
-          <div className="hidden min-h-0 overflow-y-auto border-r border-border lg:block">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[400px_1fr] lg:grid-rows-1">
+          {/* List pane — stacked above the detail (capped height) on narrow screens,
+              fixed-width side rail on lg+. (Was hidden below lg, leaving the queue
+              un-navigable on laptops/tablets.) */}
+          <div className="min-h-0 max-h-[45vh] overflow-y-auto border-b border-border lg:max-h-none lg:border-b-0 lg:border-r lg:border-border">
             {grouping === "byRule" && bulk.size > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-je-ink bg-je-teal-bg px-3 py-2 text-[12px]">
                 <span className="font-medium">{bulk.size} selected</span>
