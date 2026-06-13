@@ -1,12 +1,23 @@
 module Api
   # Mirrors convex/listings.ts queries plus the moderateListing entry point.
   class ListingsController < BaseController
-    # GET /api/listings/pending — manual queue, newest first, limit 100
+    # GET /api/listings/pending — manual queue, newest first, limit 100.
+    # Each listing embeds its current moderation result as `latestResult` so the
+    # queue can always act on it. (The Queue used to join pending listings to the
+    # capped /moderation-results/recent feed; manual items older than that window
+    # had no joinable result and could not be approved/rejected — see QueuePage
+    # resultFor.) Mirrors the embed pattern used by #recent / #by_rule.
     def pending
       listings = Listing.where(moderation_status: "manual")
                         .order(created_at: :desc, id: :desc)
                         .limit(100)
-      render json: ConvexDoc.render_many(listings)
+      latest_by_listing = ModerationResult.where(listing_id: listings.map(&:id))
+                                          .order(processed_at: :desc, id: :desc)
+                                          .group_by(&:listing_id)
+      render json: listings.map { |listing|
+        result = latest_by_listing[listing.id]&.first
+        ConvexDoc.render(listing).merge("latestResult" => ConvexDoc.render(result))
+      }
     end
 
     # GET /api/listings/recent?limit=
