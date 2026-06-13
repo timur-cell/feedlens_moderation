@@ -124,8 +124,13 @@ async function main() {
       if (path === "/api/param-scans/recent") return json(route, []);
       if (path.endsWith("/override") && method === "POST") {
         let outcome = "?";
-        try { outcome = JSON.parse(req.postData() || "{}").newOutcome; } catch {}
-        overrideCalls.push({ id: path.split("/").slice(-2, -1)[0], outcome });
+        let permanent;
+        try {
+          const body = JSON.parse(req.postData() || "{}");
+          outcome = body.newOutcome;
+          permanent = body.permanent;
+        } catch {}
+        overrideCalls.push({ id: path.split("/").slice(-2, -1)[0], outcome, permanent });
         return json(route, { success: true });
       }
       if (path.includes("/notes")) return json(route, []);
@@ -141,26 +146,33 @@ async function main() {
 
     // Detail pane should render the first listing's evidence + decision bar.
     await page.getByText("Why flagged").first().waitFor({ timeout: 15000 });
-    await page.getByRole("button", { name: /Approve/ }).waitFor({ timeout: 5000 });
-    console.log("✓ Queue split view rendered with detail + decision bar");
+    await page.getByRole("button", { name: /^Approve\b/ }).first().waitFor({ timeout: 5000 });
+    // Both "Approve" and "Approve forever" should be present in the decision bar.
+    await page.getByRole("button", { name: /Approve forever/ }).first().waitFor({ timeout: 5000 });
+    console.log("✓ Queue split view rendered with detail + decision bar (incl. Approve forever)");
 
     const decisions = [];
     for (let i = 0; i < N; i++) {
       const titleEl = page.locator(".min-h-0.flex-1.overflow-y-auto span.text-\\[17px\\]").first();
       const before = overrideCalls.length;
       const mod = i % 3;
+      // First decision exercises Shift+A (Approve forever → permanent lock).
+      const useForever = i === 0;
       const key = mod === 0 ? "a" : mod === 1 ? "r" : "n";
       const expected = mod === 0 ? "approved" : mod === 1 ? "rejected" : "notice";
-      await page.keyboard.press(key);
+      if (useForever) await page.keyboard.press("Shift+A");
+      else await page.keyboard.press(key);
       // Wait for the override to land (decide() awaits the POST).
       await page.waitForFunction((n) => true, before, { timeout: 100 }).catch(() => {});
       const deadline = Date.now() + 5000;
       while (overrideCalls.length === before && Date.now() < deadline) {
         await page.waitForTimeout(50);
       }
-      if (overrideCalls.length === before) fail(`decision ${i + 1} (${key}) did not fire an override`);
+      if (overrideCalls.length === before) fail(`decision ${i + 1} (${useForever ? "Shift+A" : key}) did not fire an override`);
       const last = overrideCalls[overrideCalls.length - 1];
       if (last.outcome !== expected) fail(`decision ${i + 1}: expected ${expected}, got ${last.outcome}`);
+      if (useForever && last.permanent !== true) fail(`decision 1 (Shift+A) should set permanent:true, got ${JSON.stringify(last.permanent)}`);
+      if (!useForever && last.permanent) fail(`decision ${i + 1} (${key}) should not set permanent, got ${JSON.stringify(last.permanent)}`);
       decisions.push(last.outcome);
       await page.waitForTimeout(120); // allow auto-advance + re-render
     }
@@ -178,7 +190,7 @@ async function main() {
     }
 
     await page.screenshot({ path: resolve(root, "screenshots", "queue-20-empty.png") }).catch(() => {});
-    console.log("\n✅ PASS — drove 20 listings through the redesigned review loop (J/K nav, A/R/N decisions, auto-advance, undo toast).");
+    console.log("\n✅ PASS — drove 20 listings through the redesigned review loop (J/K nav, A/R/N + Shift+A lock, auto-advance, undo toast).");
   } finally {
     if (browser) await browser.close();
     preview.kill("SIGTERM");

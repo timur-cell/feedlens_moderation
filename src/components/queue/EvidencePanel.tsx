@@ -140,7 +140,7 @@ export function ListingFacts({ listing }: { listing: any }) {
     listing.pricePerSqm != null
       ? `$${Math.round(listing.pricePerSqm).toLocaleString()}`
       : listing.priceUsd && listing.livingArea
-        ? `~$${Math.round(listing.priceUsd / listing.livingArea).toLocaleString()}`
+        ? `≈ $${Math.round(listing.priceUsd / listing.livingArea).toLocaleString()}`
         : null;
   const facts: [string, string | null][] = [
     ["Category", [listing.category?.replace("RealEstate", "Real estate"), listing.realEstateType].filter(Boolean).join(" · ") || null],
@@ -167,9 +167,9 @@ export function ListingFacts({ listing }: { listing: any }) {
   return (
     <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
       {facts.map(([k, v]) => (
-        <div key={k} className="flex justify-between border-b border-border py-[5px] text-[12.5px]">
-          <span className="text-je-ink-2">{k}</span>
-          {v ? <span className="num font-medium">{v}</span> : <span className="text-je-ink-3">—</span>}
+        <div key={k} className="flex justify-between gap-3 border-b border-border py-[5px] text-[12.5px]">
+          <span className="shrink-0 text-je-ink-2">{k}</span>
+          {v ? <span className="num text-right font-medium">{v}</span> : <span className="text-je-ink-3">—</span>}
         </div>
       ))}
     </div>

@@ -24,16 +24,16 @@ export function LandingPage() {
 
         <div className="max-w-5xl mx-auto text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border bg-background text-xs font-medium">
-            <SearchCheck className="size-3 text-blue-600" />
+            <SearchCheck className="size-3 text-je-teal" />
             JamesEdition Moderation System
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
+          <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl font-medium tracking-[0.02em] leading-[1.05]">
             Feed
-            <span className="text-blue-600">Lens</span>
+            <span className="text-je-teal">Lens</span>
           </h1>
           <p className="text-sm md:text-base text-muted-foreground tracking-[0.3em] uppercase -mt-2">
-            moderation
+            JamesEdition · T&amp;S
           </p>
 
           <p className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
@@ -43,7 +43,7 @@ export function LandingPage() {
 
           {!isAuthenticated && !isLoading && (
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-              <Button size="lg" className="text-base h-11 px-6 bg-blue-600 hover:bg-blue-700" asChild>
+              <Button size="lg" className="text-base h-11 px-6 bg-je-teal hover:bg-je-teal/90" asChild>
                 <Link to="/login">
                   Sign In
                   <ArrowRight className="size-4" />
@@ -53,7 +53,7 @@ export function LandingPage() {
           )}
           {isAuthenticated && (
             <div className="pt-2">
-              <Button size="lg" className="text-base h-11 px-6 bg-blue-600 hover:bg-blue-700" asChild>
+              <Button size="lg" className="text-base h-11 px-6 bg-je-teal hover:bg-je-teal/90" asChild>
                 <Link to="/dashboard">
                   Go to Dashboard
                   <ArrowRight className="size-4" />
@@ -96,10 +96,10 @@ export function LandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
             <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-background to-muted/50 border p-6 md:p-8 transition-all hover:shadow-lg hover:border-foreground/20">
-              <div className="absolute top-0 right-0 -mt-4 -mr-4 size-24 rounded-full bg-blue-500/10 blur-2xl transition-all group-hover:bg-blue-500/20" />
+              <div className="absolute top-0 right-0 -mt-4 -mr-4 size-24 rounded-full bg-je-teal/10 blur-2xl transition-all group-hover:bg-je-teal/20" />
               <div className="relative">
-                <div className="inline-flex size-11 items-center justify-center rounded-xl bg-blue-500/10 mb-5">
-                  <Shield className="size-5 text-blue-600" />
+                <div className="inline-flex size-11 items-center justify-center rounded-xl bg-je-teal/10 mb-5">
+                  <Shield className="size-5 text-je-teal" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">Simple Rules</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
@@ -156,19 +156,19 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-2xl bg-blue-600 text-white p-6 md:p-8 transition-all hover:shadow-lg">
+            <div className="group relative overflow-hidden rounded-2xl bg-je-teal text-white p-6 md:p-8 transition-all hover:shadow-lg">
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="size-5" />
                   <h3 className="font-semibold text-lg">Ready to moderate?</h3>
                 </div>
-                <p className="text-blue-100 text-sm leading-relaxed mb-4">
+                <p className="text-white/80 text-sm leading-relaxed mb-4">
                   Sign in to access the moderation dashboard and start reviewing listings.
                 </p>
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="bg-white text-blue-600 hover:bg-blue-50"
+                  className="bg-white text-je-teal hover:bg-white/90"
                   asChild
                 >
                   <Link to={isAuthenticated ? "/dashboard" : "/login"}>

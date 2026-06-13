@@ -17,6 +17,7 @@ import {
   Ban,
   MessageSquare,
   SkipForward,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { jeImageUrl } from "@/components/JeImage";
@@ -162,7 +163,7 @@ function DecisionBar({
   onTemplate: (v: string) => void;
   reasonType: string;
   onReason: (v: string) => void;
-  onDecide: (o: "approved" | "rejected" | "notice") => void;
+  onDecide: (o: "approved" | "rejected" | "notice", opts?: { permanent?: boolean }) => void;
   onSkip: () => void;
   busy: boolean;
   compact?: boolean;
@@ -181,6 +182,15 @@ function DecisionBar({
         onClick={() => onDecide("approved")}
       >
         <Check className="size-4" /> Approve <Kbd className="border-white/40 bg-transparent text-white/90">A</Kbd>
+      </Button>
+      <Button
+        variant="outline"
+        className="h-[38px] gap-2 rounded-none border-je-success px-4 text-je-success hover:bg-je-success-bg"
+        disabled={busy}
+        title="Approve and lock — feed re-imports and automated re-moderation will never change this decision until a moderator unlocks it"
+        onClick={() => onDecide("approved", { permanent: true })}
+      >
+        <Lock className="size-3.5" /> Approve forever <Kbd>⇧A</Kbd>
       </Button>
       <Button
         className="h-[38px] gap-2 rounded-none bg-je-error px-5 text-white hover:bg-je-error/90"
@@ -382,6 +392,7 @@ function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
     ["J / ↓", "Next listing"],
     ["K / ↑", "Previous listing"],
     ["A", "Approve"],
+    ["⇧A", "Approve forever (lock)"],
     ["R", "Reject"],
     ["N", "Notice"],
     ["S", "Skip"],
@@ -583,8 +594,11 @@ export default function QueuePage() {
   );
 
   const decide = useCallback(
-    async (outcome: "approved" | "rejected" | "notice", listingArg?: Listing) => {
-      const listing = listingArg || selected;
+    async (
+      outcome: "approved" | "rejected" | "notice",
+      opts?: { permanent?: boolean; listing?: Listing },
+    ) => {
+      const listing = opts?.listing || selected;
       if (!listing) return;
       const result = resultFor(listing);
       if (!result?._id) {
@@ -612,6 +626,7 @@ export default function QueuePage() {
       setBusy(true);
       setDecided((prev) => new Set(prev).add(listing._id));
       setSelectedId(nextListing?._id ?? null);
+      const permanent = opts?.permanent ?? false;
       try {
         await override({
           resultId: result._id,
@@ -619,9 +634,10 @@ export default function QueuePage() {
           reason: reasonType !== "other" ? reasonType : undefined,
           sellerMessage,
           refuseReasonType: refuse,
+          permanent: permanent || undefined,
         });
         const verb = outcome === "approved" ? "approved" : outcome === "rejected" ? "rejected" : "noticed";
-        toast(`${listing.title} — ${verb}`, {
+        toast(`${listing.title} — ${verb}${permanent ? " · locked" : ""}`, {
           duration: 8000,
           action: { label: "Undo", onClick: () => undoDecision(listing, result) },
         });
@@ -681,6 +697,7 @@ export default function QueuePage() {
       next: () => selectByOffset(1),
       prev: () => selectByOffset(-1),
       approve: () => decide("approved"),
+      approveForever: () => decide("approved", { permanent: true }),
       reject: () => decide("rejected"),
       notice: () => decide("notice"),
       skip,
@@ -709,7 +726,7 @@ export default function QueuePage() {
       onTemplate={setTemplateId}
       reasonType={reasonType}
       onReason={setReasonType}
-      onDecide={(o) => decide(o)}
+      onDecide={(o, opts) => decide(o, opts)}
       onSkip={skip}
       busy={busy}
       compact={focusMode}

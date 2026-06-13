@@ -217,11 +217,11 @@ function SidebarHeaderContent() {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarHeader className="border-b border-sidebar-border">
-      <Link to="/dashboard" onClick={() => setOpenMobile(false)} className="flex flex-col px-2 py-1.5">
-        <span className="font-serif text-[20px] font-medium leading-tight tracking-tight">
+      <Link to="/dashboard" onClick={() => setOpenMobile(false)} className="flex flex-col gap-1 px-2 py-2">
+        <span className="font-serif text-[27px] font-medium leading-none tracking-[0.02em]">
           Feed<span className="text-je-teal">Lens</span>
         </span>
-        <span className="text-[9.5px] font-semibold uppercase leading-none tracking-[0.16em] text-je-ink-3">
+        <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.18em] text-je-ink-3">
           JamesEdition · T&amp;S
         </span>
       </Link>
