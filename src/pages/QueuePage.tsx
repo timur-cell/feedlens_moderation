@@ -1080,7 +1080,7 @@ function QueueList({
           </div>
           <div className="mb-1 mt-0.5 truncate text-[11.5px] text-je-ink-2">{formatLocationOffice(l)}</div>
           <div className="flex items-center gap-1.5">
-            {rule && <RuleChip name={rule} />}
+            {rule && <RuleChip name={rule} to={`/rules?rule=${encodeURIComponent(rule)}`} />}
             <AgeChip sinceMs={l.importedAt} now={now} />
           </div>
         </div>
