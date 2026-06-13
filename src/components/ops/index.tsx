@@ -7,6 +7,7 @@
 // These are the shared building blocks the redesigned screens compose with —
 // see docs design handoff "Design tokens / Component sheet".
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ageSeverity, formatAge, type AgeSeverity } from "@/lib/queueFormat";
 
@@ -111,18 +112,32 @@ export function RuleChip({
   name,
   onDismiss,
   className,
+  to,
 }: {
   name: string;
   onDismiss?: () => void;
   className?: string;
+  /** When set, the chip becomes a link to the rule's page (stops row-click propagation). */
+  to?: string;
 }) {
+  const base =
+    "inline-flex h-5 max-w-full items-center gap-1 rounded-[4px] border border-border bg-je-surface px-1.5 font-mono text-[10px] text-je-ink";
+
+  if (to && !onDismiss) {
+    return (
+      <Link
+        to={to}
+        onClick={(e) => e.stopPropagation()}
+        title={`Open rule ${name}`}
+        className={cn(base, "transition-colors hover:border-je-teal hover:text-je-teal", className)}
+      >
+        <span className="truncate">{name}</span>
+      </Link>
+    );
+  }
+
   return (
-    <span
-      className={cn(
-        "inline-flex h-5 max-w-full items-center gap-1 rounded-[4px] border border-border bg-je-surface px-1.5 font-mono text-[10px] text-je-ink",
-        className,
-      )}
-    >
+    <span className={cn(base, className)}>
       <span className="truncate">{name}</span>
       {onDismiss && (
         <button

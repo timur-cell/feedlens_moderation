@@ -16,9 +16,10 @@ import {
   Sparkles,
   Wrench,
   Search,
+  ChevronLeft,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
@@ -52,13 +53,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { StatusChip, PrecisionBar, SectionLabel } from "@/components/ops";
 import { rulePrecision, formatAge } from "@/lib/queueFormat";
 import { toast } from "sonner";
@@ -117,10 +111,10 @@ function truncateEmail(str?: string): string {
 
 // ─── Items Matched Preview ───────────────────────────────────────
 
-function ItemsMatchedByRule({ ruleName }: { ruleName: string }) {
+function ItemsMatchedByRule({ ruleName, limit = 20 }: { ruleName: string; limit?: number }) {
   const { data: matchedData } = useApiQuery(apiClient.moderation.byRule, {
     ruleName,
-    limit: 20,
+    limit,
   });
 
   if (!matchedData) {
@@ -189,9 +183,11 @@ function ItemsMatchedByRule({ ruleName }: { ruleName: string }) {
               </div>
               <div className="w-[140px] shrink-0 flex flex-wrap gap-0.5">
                 {item.ruleMatches?.slice(0, 2).map((m: any, i: number) => (
-                  <Badge key={i} variant={m.ruleName === ruleName ? "default" : "outline"} className={`text-[9px] truncate max-w-[65px] ${m.ruleName === ruleName ? "bg-blue-500 hover:bg-blue-600" : ""}`}>
-                    {m.ruleName.split("_").slice(0, 2).join("_")}
-                  </Badge>
+                  <Link key={i} to={`/rules?rule=${encodeURIComponent(m.ruleName)}`} title={`Open rule ${m.ruleName}`}>
+                    <Badge variant={m.ruleName === ruleName ? "default" : "outline"} className={`text-[9px] truncate max-w-[65px] cursor-pointer ${m.ruleName === ruleName ? "bg-blue-500 hover:bg-blue-600" : "hover:border-je-teal hover:text-je-teal"}`}>
+                      {m.ruleName.split("_").slice(0, 2).join("_")}
+                    </Badge>
+                  </Link>
                 ))}
                 {(item.ruleMatches?.length || 0) > 2 && (
                   <Badge variant="outline" className="text-[9px]">+{item.ruleMatches.length - 2}</Badge>
@@ -220,25 +216,20 @@ function actionKind(action: string): "rejected" | "notice" | "manual" {
   return action === "reject" ? "rejected" : action === "notice" ? "notice" : "manual";
 }
 
-function RuleDrawer({
+function RuleDetailView({
   rule,
-  open,
-  onClose,
+  onBack,
   onEdit,
   onDelete,
+  onToggle,
 }: {
   rule: any;
-  open: boolean;
-  onClose: () => void;
+  onBack: () => void;
   onEdit: (r: any) => void;
   onDelete: (r: any) => void;
+  onToggle: (r: any) => void;
 }) {
-  const [showMatched, setShowMatched] = useState(false);
   const [updateRule] = useApiMutation(apiClient.rules.update);
-  // Reset the matched-items panel whenever a different rule opens.
-  useMemo(() => setShowMatched(false), [rule?._id]);
-
-  if (!rule) return null;
 
   const setShadow = (shadow: boolean) => {
     updateRule({ id: rule._id, shadow })
@@ -257,23 +248,65 @@ function RuleDrawer({
   const lowPrecision = precision != null && precision < 60 && rule.enabled;
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 rounded-none p-0 sm:max-w-[480px]">
-        <SheetHeader className="gap-1 border-b border-border p-5">
-          <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold">
-            {rule.displayName}
-            {rule.shadow && <StatusChip kind="shadow" label="Shadow" />}
-            {!rule.shadow && lowPrecision && <StatusChip kind="shadow" label="Shadow candidate" />}
-            {!rule.enabled && <StatusChip kind="off" label="Disabled" />}
-          </SheetTitle>
-          <div className="text-[12px] text-je-ink-2">
-            {(categoryConfig[rule.category]?.label || rule.category)} ·{" "}
-            {rule.listingCategory === "cars" ? "cars" : "real estate"} ·{" "}
-            {actionConfig[rule.action]?.label?.toLowerCase() || rule.action}s to {rule.tier} tier
-          </div>
-        </SheetHeader>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Header bar */}
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-border px-6 py-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 h-[30px] gap-1 rounded-none px-2 text-je-ink-2"
+          onClick={onBack}
+        >
+          <ChevronLeft className="size-4" /> Rules
+        </Button>
+        <h1 className="text-[18px] font-semibold tracking-tight">{rule.displayName}</h1>
+        {rule.shadow && <StatusChip kind="shadow" label="Shadow" />}
+        {!rule.shadow && lowPrecision && <StatusChip kind="shadow" label="Shadow candidate" />}
+        {!rule.enabled && <StatusChip kind="off" label="Disabled" />}
+        <div className="ml-auto flex items-center gap-2">
+          <label className="mr-1 flex items-center gap-2 text-[12px] text-je-ink-2">
+            <Switch
+              checked={rule.enabled}
+              onCheckedChange={() => onToggle(rule)}
+              className="data-[state=checked]:bg-je-success"
+            />
+            {rule.enabled ? "Live" : "Off"}
+          </label>
+          {rule.shadow ? (
+            <Button size="sm" className="rounded-none" onClick={() => setShadow(false)}>
+              Promote to live
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="rounded-none" onClick={() => setShadow(true)}>
+              Move to shadow
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="rounded-none" onClick={() => onEdit(rule)}>
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-none text-je-error hover:text-je-error"
+            onClick={() => onDelete(rule)}
+          >
+            Retire…
+          </Button>
+        </div>
+      </div>
 
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+      {/* Meta line */}
+      <div className="border-b border-border px-6 py-2 text-[12px] text-je-ink-2">
+        {(categoryConfig[rule.category]?.label || rule.category)} ·{" "}
+        {rule.listingCategory === "cars" ? "cars" : "real estate"} ·{" "}
+        {actionConfig[rule.action]?.label?.toLowerCase() || rule.action}s to {rule.tier} tier ·{" "}
+        priority {rule.priority}
+      </div>
+
+      {/* Body: rule info (left) + matched properties (right) */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,400px)_1fr] lg:divide-x lg:divide-border">
+        {/* Left: rule details */}
+        <div className="flex flex-col gap-4 overflow-y-auto p-6">
           {rule.description && <p className="text-[13px] text-je-ink-2">{rule.description}</p>}
 
           <div className="flex flex-wrap items-center gap-2">
@@ -291,7 +324,7 @@ function RuleDrawer({
           {/* Condition */}
           <div>
             <SectionLabel className="mb-1.5">Condition</SectionLabel>
-            <pre className="max-h-48 overflow-auto bg-je-surface px-2.5 py-2 font-mono text-[11.5px]">
+            <pre className="max-h-64 overflow-auto bg-je-surface px-2.5 py-2 font-mono text-[11.5px]">
               {JSON.stringify(rule.config, null, 2)}
             </pre>
           </div>
@@ -358,49 +391,15 @@ function RuleDrawer({
               <div>Created</div>
             </div>
           </div>
-
-          {/* Matched items */}
-          <div className="border-t border-border pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-none text-xs"
-              onClick={() => setShowMatched((v) => !v)}
-            >
-              <List className="mr-1 size-3" />
-              {showMatched ? "Hide matched items" : "Show matched items"}
-              {(rule.matchCount || 0) > 0 && (
-                <span className="num ml-1 text-je-ink-3">· {rule.matchCount}</span>
-              )}
-            </Button>
-            {showMatched && <ItemsMatchedByRule ruleName={rule.name} />}
-          </div>
         </div>
 
-        <SheetFooter className="flex-row gap-2 border-t border-border p-4">
-          {rule.shadow ? (
-            <Button size="sm" className="rounded-none" onClick={() => setShadow(false)}>
-              Promote to live
-            </Button>
-          ) : (
-            <Button variant="outline" size="sm" className="rounded-none" onClick={() => setShadow(true)}>
-              Move to shadow
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="rounded-none" onClick={() => onEdit(rule)}>
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto rounded-none text-je-error hover:text-je-error"
-            onClick={() => onDelete(rule)}
-          >
-            Retire…
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        {/* Right: matched properties */}
+        <div className="min-h-0 overflow-y-auto p-6">
+          <SectionLabel className="mb-1.5">Matched properties</SectionLabel>
+          <ItemsMatchedByRule ruleName={rule.name} limit={50} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -766,7 +765,6 @@ export default function RulesPage() {
   const [removeRule] = useApiMutation(apiClient.rules.remove);
 
   const [editingRule, setEditingRule] = useState<any>(null);
-  const [drawerRule, setDrawerRule] = useState<any>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -775,8 +773,10 @@ export default function RulesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState("matches");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchParams] = useSearchParams();
-  const highlightedRule = searchParams.get("highlight");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A rule is opened full-screen via ?rule=<name>. We also honour the older
+  // ?highlight=<name> deep-links (Lists/Dashboard) so they open the same view.
+  const selectedRuleName = searchParams.get("rule") || searchParams.get("highlight");
 
   const filtered = useMemo(() => {
     if (!rules) return [];
@@ -819,6 +819,9 @@ export default function RulesPage() {
 
   const enabledCount = rules.filter((r: any) => r.enabled).length;
   const offCount = rules.length - enabledCount;
+  const selectedRule = selectedRuleName
+    ? rules.find((r: any) => r.name === selectedRuleName) ?? null
+    : null;
 
   const handleToggle = (rule: any) => {
     toggleEnabled({ id: rule._id }).catch(() => toast.error(`Failed to toggle "${rule.displayName}"`));
@@ -830,7 +833,7 @@ export default function RulesPage() {
       await removeRule({ id: deleteConfirm._id });
       toast.success(`Rule "${deleteConfirm.displayName}" deleted`);
       setDeleteConfirm(null);
-      setDrawerRule(null);
+      setSearchParams({});
     } catch {
       toast.error("Failed to delete rule");
     }
@@ -838,6 +841,16 @@ export default function RulesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {selectedRule ? (
+        <RuleDetailView
+          rule={selectedRule}
+          onBack={() => setSearchParams({})}
+          onEdit={(r) => setEditingRule(r)}
+          onDelete={(r) => setDeleteConfirm(r)}
+          onToggle={handleToggle}
+        />
+      ) : (
+        <>
       {/* Topbar */}
       <div className="flex items-center gap-3.5 border-b border-border px-6 py-3.5">
         <h1 className="text-[18px] font-semibold tracking-tight">Rules</h1>
@@ -945,14 +958,13 @@ export default function RulesPage() {
               filtered.map((rule: any) => {
                 const precision = rulePrecision(rule);
                 const lowPrecision = precision != null && precision < 60 && rule.enabled;
-                const isHighlighted = highlightedRule === rule.name;
                 return (
                   <tr
                     key={rule._id}
-                    onClick={() => setDrawerRule(rule)}
+                    onClick={() => setSearchParams({ rule: rule.name })}
                     className={`cursor-pointer border-b border-border align-middle hover:bg-je-surface ${
-                      isHighlighted ? "bg-je-teal-bg" : ""
-                    } ${!rule.enabled ? "opacity-60" : ""}`}
+                      !rule.enabled ? "opacity-60" : ""
+                    }`}
                   >
                     <td className="py-2.5 pr-3" onClick={(e) => e.stopPropagation()}>
                       <Switch
@@ -994,18 +1006,8 @@ export default function RulesPage() {
           </tbody>
         </table>
       </div>
-
-      {/* Drawer */}
-      <RuleDrawer
-        rule={drawerRule ? (rules.find((r: any) => r._id === drawerRule._id) ?? drawerRule) : null}
-        open={!!drawerRule}
-        onClose={() => setDrawerRule(null)}
-        onEdit={(r) => {
-          setDrawerRule(null);
-          setEditingRule(r);
-        }}
-        onDelete={(r) => setDeleteConfirm(r)}
-      />
+        </>
+      )}
 
       {/* Edit dialog */}
       {editingRule && <RuleEditorDialog rule={editingRule} open={!!editingRule} onClose={() => setEditingRule(null)} />}
