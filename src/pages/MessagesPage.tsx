@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useApiMutation, useApiQuery } from "@/hooks/useApiQuery";
 import { apiClient } from "@/lib/apiClient";
 import { StatusChip, SectionLabel } from "@/components/ops";
+import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -205,7 +206,7 @@ function MessageDrawer({
 }
 
 export default function MessagesPage() {
-  const { data: templates } = useApiQuery(apiClient.messages.list);
+  const { data: templates, error: templatesError, refetch: refetchTemplates } = useApiQuery(apiClient.messages.list);
   const [deleteTemplate] = useApiMutation(apiClient.messages.remove);
   const [drawer, setDrawer] = useState<{ open: boolean; template: any | null }>({ open: false, template: null });
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
@@ -233,6 +234,9 @@ export default function MessagesPage() {
     }
   };
 
+  if (templatesError && !templates) {
+    return <QueryError onRetry={refetchTemplates} />;
+  }
   if (!templates) {
     return (
       <div className="flex flex-1 items-center justify-center p-12">

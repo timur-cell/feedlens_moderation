@@ -54,6 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { StatusChip, PrecisionBar, SectionLabel } from "@/components/ops";
+import { QueryError } from "@/components/QueryError";
 import { rulePrecision, formatAge } from "@/lib/queueFormat";
 import { toast } from "sonner";
 
@@ -760,7 +761,7 @@ function Facet({
 // ─── Main Page: analytics table + drawer ────────────────────────
 
 export default function RulesPage() {
-  const { data: rules } = useApiQuery(apiClient.rules.list);
+  const { data: rules, error: rulesError, refetch: refetchRules } = useApiQuery(apiClient.rules.list);
   const [toggleEnabled] = useApiMutation(apiClient.rules.toggle);
   const [removeRule] = useApiMutation(apiClient.rules.remove);
 
@@ -809,6 +810,9 @@ export default function RulesPage() {
     return arr;
   }, [rules, categoryFilter, scopeFilter, actionFilter, statusFilter, sort, searchQuery]);
 
+  if (rulesError && !rules) {
+    return <QueryError onRetry={refetchRules} />;
+  }
   if (!rules) {
     return (
       <div className="flex flex-1 items-center justify-center p-12">

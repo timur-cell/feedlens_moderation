@@ -1,4 +1,5 @@
 import { formatRelativeTime } from "@/lib/utils";
+import { QueryError } from "@/components/QueryError";
 import {
   Users,
   UserPlus,
@@ -630,12 +631,15 @@ function UserRow({ user, onSetPassword }: { user: any; onSetPassword: (user: any
 
 /* ─── Main Page ───────────────────────────────────────────────── */
 export default function UsersPage() {
-  const { data: users } = useApiQuery(apiClient.users.list);
+  const { data: users, error: usersError, refetch: refetchUsers } = useApiQuery(apiClient.users.list);
   const { data: stats } = useApiQuery(apiClient.users.stats);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
+  if (usersError && !users) {
+    return <QueryError onRetry={refetchUsers} />;
+  }
   if (!users) {
     return (
       <div className="flex justify-center py-12">
