@@ -71,7 +71,7 @@ module Api
     def rule_params
       permitted = params.permit(
         :name, :displayName, :description, :category, :listingCategory,
-        :tier, :enabled, :priority, :sellerMessage
+        :tier, :enabled, :priority, :sellerMessage, :shadow
       ).to_h.transform_keys(&:underscore)
       permitted["config"] = body_config
       # `action` must come from the request body — the routing params
@@ -83,7 +83,7 @@ module Api
     def rule_update_params
       permitted = params.permit(
         :displayName, :description, :listingCategory,
-        :tier, :enabled, :priority, :sellerMessage
+        :tier, :enabled, :priority, :sellerMessage, :shadow
       ).to_h.transform_keys(&:underscore)
       permitted["config"] = body_config if body_params.key?("config")
       permitted["action"] = body_params["action"] if body_params.key?("action")

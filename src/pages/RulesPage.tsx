@@ -234,10 +234,17 @@ function RuleDrawer({
   onDelete: (r: any) => void;
 }) {
   const [showMatched, setShowMatched] = useState(false);
+  const [updateRule] = useApiMutation(apiClient.rules.update);
   // Reset the matched-items panel whenever a different rule opens.
   useMemo(() => setShowMatched(false), [rule?._id]);
 
   if (!rule) return null;
+
+  const setShadow = (shadow: boolean) => {
+    updateRule({ id: rule._id, shadow })
+      .then(() => toast.success(shadow ? "Moved to shadow" : "Promoted to live"))
+      .catch(() => toast.error("Failed to update rule"));
+  };
 
   const precision = rulePrecision(rule);
   const listRefs = [
@@ -255,7 +262,8 @@ function RuleDrawer({
         <SheetHeader className="gap-1 border-b border-border p-5">
           <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold">
             {rule.displayName}
-            {lowPrecision && <StatusChip kind="shadow" label="Shadow candidate" />}
+            {rule.shadow && <StatusChip kind="shadow" label="Shadow" />}
+            {!rule.shadow && lowPrecision && <StatusChip kind="shadow" label="Shadow candidate" />}
             {!rule.enabled && <StatusChip kind="off" label="Disabled" />}
           </SheetTitle>
           <div className="text-[12px] text-je-ink-2">
@@ -302,6 +310,13 @@ function RuleDrawer({
                   : `${rule.falsePositiveCount || 0} overridden by moderators · last match ${rule.lastMatchedAt ? formatAge(rule.lastMatchedAt) + " ago" : "—"}.`}
                 {lowPrecision && " Precision below 60% — consider shadow review."}
               </div>
+              {rule.shadow && (
+                <div className="mt-1.5 border-t border-je-teal-border pt-1.5 text-je-teal">
+                  Shadow mode: would have matched{" "}
+                  <strong className="num">{(rule.shadowMatchCount || 0).toLocaleString()}</strong> listing
+                  {rule.shadowMatchCount === 1 ? "" : "s"} without acting.
+                </div>
+              )}
             </div>
           </div>
 
@@ -363,8 +378,17 @@ function RuleDrawer({
         </div>
 
         <SheetFooter className="flex-row gap-2 border-t border-border p-4">
-          <Button size="sm" className="rounded-none" onClick={() => onEdit(rule)}>
-            Edit rule
+          {rule.shadow ? (
+            <Button size="sm" className="rounded-none" onClick={() => setShadow(false)}>
+              Promote to live
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="rounded-none" onClick={() => setShadow(true)}>
+              Move to shadow
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="rounded-none" onClick={() => onEdit(rule)}>
+            Edit
           </Button>
           <Button
             variant="ghost"
@@ -761,7 +785,13 @@ export default function RulesPage() {
       const scopeMatch = scopeFilter === "all" || r.listingCategory === scopeFilter;
       const actionMatch = actionFilter === "all" || r.action === actionFilter;
       const statusMatch =
-        statusFilter === "all" || (statusFilter === "live" ? r.enabled : !r.enabled);
+        statusFilter === "all"
+          ? true
+          : statusFilter === "shadow"
+            ? r.shadow
+            : statusFilter === "live"
+              ? r.enabled && !r.shadow
+              : !r.enabled;
       const q = searchQuery.toLowerCase();
       const searchMatch =
         !q ||
@@ -870,6 +900,7 @@ export default function RulesPage() {
           options={[
             { value: "all", label: "All" },
             { value: "live", label: "Live" },
+            { value: "shadow", label: "Shadow" },
             { value: "off", label: "Disabled" },
           ]}
           onChange={setStatusFilter}
@@ -933,7 +964,8 @@ export default function RulesPage() {
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{rule.displayName}</span>
-                        {lowPrecision && <StatusChip kind="shadow" label="Shadow?" />}
+                        {rule.shadow && <StatusChip kind="shadow" label="Shadow" />}
+                        {!rule.shadow && lowPrecision && <StatusChip kind="shadow" label="Shadow?" />}
                       </div>
                       {rule.description && (
                         <div className="max-w-[420px] truncate text-[11.5px] text-je-ink-2">{rule.description}</div>
@@ -965,7 +997,7 @@ export default function RulesPage() {
 
       {/* Drawer */}
       <RuleDrawer
-        rule={drawerRule}
+        rule={drawerRule ? (rules.find((r: any) => r._id === drawerRule._id) ?? drawerRule) : null}
         open={!!drawerRule}
         onClose={() => setDrawerRule(null)}
         onEdit={(r) => {

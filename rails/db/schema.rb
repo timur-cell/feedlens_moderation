@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_12_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_13_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -299,12 +299,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_000001) do
     t.string "name", null: false
     t.integer "priority", null: false
     t.text "seller_message"
+    t.boolean "shadow", default: false, null: false
+    t.integer "shadow_match_count", default: 0, null: false
     t.string "tier", null: false
     t.datetime "updated_at", null: false
     t.index ["category"], name: "index_rules_on_category"
     t.index ["enabled"], name: "index_rules_on_enabled"
     t.index ["listing_category"], name: "index_rules_on_listing_category"
     t.index ["name"], name: "index_rules_on_name", unique: true
+    t.index ["shadow"], name: "index_rules_on_shadow"
+  end
+
+  create_table "saved_views", force: :cascade do |t|
+    t.bigint "moderator_id", null: false
+    t.string "name", null: false
+    t.string "scope", default: "decisions", null: false
+    t.text "query", default: "", null: false
+    t.bigint "created_at_ms"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["moderator_id", "scope"], name: "index_saved_views_on_moderator_id_and_scope"
+    t.index ["moderator_id"], name: "index_saved_views_on_moderator_id"
   end
 
   create_table "settings", force: :cascade do |t|
